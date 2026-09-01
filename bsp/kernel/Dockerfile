@@ -73,6 +73,7 @@ RUN cd /ksrc && \
     grep -q "^CONFIG_AIC_WLAN_SUPPORT=y" .config && \
     grep -q '^CONFIG_AIC_FW_PATH="/lib/firmware"' .config && \
     grep -q '^CONFIG_RFKILL_RK=y' .config && \
+    grep -q '^CONFIG_RTC_DRV_HYM8563=y' .config && \
     grep -q '^CONFIG_LEDS_TRIGGER_HEARTBEAT=y' .config && \
     grep -q '^# CONFIG_WL_ROCKCHIP is not set' .config && \
     ! grep -q '^CONFIG_AP6XXX=' .config && \
