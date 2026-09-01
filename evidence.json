@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "board": "cx3576",
+  "revision": "all",
+  "bootAssurance": "I1",
+  "qualification": "Verity-protected root is evidenced against the assembled image by the verify suite, and A/B fallback by the U-Boot sandbox handshake suite executing the shipped boot.cmd. I2 is pending provisioned production trust anchors and on-board tampered-bundle/rollback negative suites, which this tree does not carry. CONFIG_FIT_SIGNATURE is configured nowhere (docs/design/boards.md section 8), so nothing left of the verity root is verified and no claim above I1 is made.",
+  "evidenceRefs": [
+    {
+      "class": "verity-root",
+      "ref": "make os-verify-cx3576 (verify/run.sh --verify --board cx3576; check verity-payload-verifies)"
+    },
+    {
+      "class": "ab-fallback",
+      "ref": "make os-uboot-handshake-test (tests/handshake-test/)"
+    }
+  ],
+  "physicalBoundaries": {
+    "jtag": "Open on the bench; no closed or fused state is documented or enforced for any revision (docs/design/manufacturing.md section 6).",
+    "serialConsole": "Present in the field with a login prompt only; no account accepts a credential (docs/design/access.md section 2).",
+    "recoveryPath": "rockusb SoC loader mode, open to anyone with physical access; it is the recovery path and the stated physical-access boundary (docs/design/manufacturing.md section 6)."
+  }
+}
