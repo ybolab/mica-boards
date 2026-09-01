@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "board": "x64",
+  "revision": "all",
+  "bootAssurance": "I1",
+  "qualification": "Verity-protected root is evidenced against the assembled image by the verify suite. No suite in this tree exercises A/B fallback through the GRUB boot path, and I2 is additionally pending provisioned production trust anchors and tampered-bundle/rollback negative suites, so I1 is claimed on the verity evidence alone. The UEFI firmware is the machine owner's; whatever verification it performs is the platform's claim, not this project's (docs/design/security-model.md section 4).",
+  "evidenceRefs": [
+    {
+      "class": "verity-root",
+      "ref": "bash verify/run.sh --verify --board x64 (check verity-payload-verifies)"
+    }
+  ],
+  "physicalBoundaries": {
+    "jtag": "Generic PC platform; mos specifies no JTAG/SWD port and controls none -- debug exposure is defined by the platform owner's hardware and firmware.",
+    "serialConsole": "Present where the platform exposes one, with a login prompt only; no account accepts a credential (docs/design/access.md section 2).",
+    "recoveryPath": "Whole-disk reflash from external boot media through the machine's own UEFI firmware; open to physical access by design (docs/design/security-model.md section 1)."
+  }
+}
