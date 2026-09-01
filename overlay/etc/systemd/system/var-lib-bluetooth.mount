@@ -1,0 +1,19 @@
+[Unit]
+Description=Bluetooth pairing keys from the STATE partition
+# bluez stores link keys and paired-device records under /var/lib/bluetooth.
+# /var is EPHEMERAL and declared disposable, so leaving pairings there would
+# mean every device re-pairs after a log-driven /var wipe. Pairings are
+# credentials: they belong on STATE.
+Requires=mos-seed-var.service mos-seed-state.service
+After=mos-seed-var.service mos-seed-state.service
+RequiresMountsFor=/mnt/state
+Before=bluetooth.service
+
+[Mount]
+What=/mnt/state/bluetooth
+Where=/var/lib/bluetooth
+Type=none
+Options=bind
+
+[Install]
+WantedBy=local-fs.target

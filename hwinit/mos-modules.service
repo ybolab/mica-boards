@@ -1,0 +1,11 @@
+[Unit]
+Description=Load board hardware modules
+ConditionPathExists=/etc/mos/modules.conf
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/mos/hwinit-modules
+TimeoutStartSec=30
+
+[Install]
+WantedBy=multi-user.target

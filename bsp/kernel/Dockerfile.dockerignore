@@ -1,0 +1,5 @@
+# kernel project context allowlist (context = repo root)
+*
+!kernel/config/
+!kernel/patches/
+!kernel/dts/

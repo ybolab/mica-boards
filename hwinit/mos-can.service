@@ -1,0 +1,11 @@
+[Unit]
+Description=Configure CAN interface bitrate
+ConditionPathExists=/etc/mos/can.conf
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/mos/hwinit-can
+TimeoutStartSec=15
+
+[Install]
+WantedBy=multi-user.target

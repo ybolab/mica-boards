@@ -1,0 +1,6 @@
+# Disk image assembly inputs.
+*
+!out/uboot/u-boot-rockchip.bin
+!out/kernel/Image
+!out/kernel/rk3576-src.dtb
+!out/rootfs/rootfs.img
