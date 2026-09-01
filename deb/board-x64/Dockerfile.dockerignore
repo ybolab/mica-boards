@@ -1,0 +1,10 @@
+# The build context is this producer's own directory, and this producer needs
+# NOTHING out of it. Its payload comes from the board directory, the shared
+# overlay, the initramfs sources and pkgs/rauc, all of which arrive as named
+# build contexts (see producer.env's BUILD_CONTEXTS), and the packer arrives as
+# the `packer` context the driver passes itself.
+#
+# So the context is emptied rather than filtered: an edit to producer.env or to
+# the PREPARE hook render.sh, neither of which the build reads, cannot invalidate
+# this producer's cache, and nothing can be COPYed from there by accident.
+*

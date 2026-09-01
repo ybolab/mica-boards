@@ -1,0 +1,25 @@
+Package: mos-board-x64
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: mos build <mos@example.invalid>
+Section: admin
+Priority: optional
+Depends: mos-system (= @VERSION@), linux-image-amd64, initramfs-tools, cryptsetup-bin, ${shlibs:Depends}
+Description: mos board support -- x64 (QEMU/UEFI, A/B layout)
+ Everything the image carries because it is the x64 board: /etc/fstab and the
+ ESP mount unit rendered from boards/x64/board.env, the RAUC system
+ configuration for its grub backend, the dm-verity initramfs hook and local-top
+ script, and /usr/bin/grub-editenv. The ESP's own grub.cfg is not in here: the
+ image assembler renders it from the repository, so a device copy would be an
+ unrendered template nothing reads.
+ .
+ There is no vendor BSP behind this board. A UEFI machine's firmware provides
+ the boot chain and the kernel is Debian's own, so linux-image-amd64 is a
+ dependency rather than a payload -- and the initramfs is built by that
+ package's own trigger, from the two initramfs-tools files this package ships.
+ .
+ initramfs-tools and cryptsetup-bin are named because ELF metadata cannot show
+ them: the hook is read by update-initramfs and copies veritysetup into the
+ initrd by name, and neither relationship is visible to dpkg-shlibdeps.
+ grub-editenv's libdevmapper is not named here: it is an ELF dependency, so
+ ${shlibs:Depends} derives it, and with the version dpkg-shlibdeps reads.
