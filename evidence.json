@@ -3,11 +3,15 @@
   "board": "x64",
   "revision": "all",
   "bootAssurance": "I1",
-  "qualification": "Verity-protected root is evidenced against the assembled image by the verify suite. No suite in this tree exercises A/B fallback through the GRUB boot path, and I2 is additionally pending provisioned production trust anchors and tampered-bundle/rollback negative suites, so I1 is claimed on the verity evidence alone. The UEFI firmware is the machine owner's; whatever verification it performs is the platform's claim, not this project's (docs/design/security-model.md section 4).",
+  "qualification": "Verity-protected root is evidenced against the assembled image by the verify suite, and wrong-key/tampered-bundle refusal by the host-side negative suite. I2 waits for provisioned production trust anchors and on-board runs of both the A/B-fallback and negative suites; no suite in this tree exercises A/B fallback through the GRUB boot path, so I1 is claimed on the verity evidence alone. The UEFI firmware is the machine owner's; whatever verification it performs is the platform's claim, not this project's (docs/design/security-model.md section 4).",
   "evidenceRefs": [
     {
       "class": "verity-root",
       "ref": "bash verify/run.sh --verify --board x64 (check verity-payload-verifies)"
+    },
+    {
+      "class": "update-negative",
+      "ref": "bash tests/rauc-trust-negative-test.sh (wrong-key / tampered-bundle refusal suite, host-side)"
     }
   ],
   "physicalBoundaries": {
