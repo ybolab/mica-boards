@@ -3,7 +3,7 @@
   "board": "cx3576",
   "revision": "all",
   "bootAssurance": "I1",
-  "qualification": "Verity-protected root is evidenced against the assembled image by the verify suite, and A/B fallback by the U-Boot sandbox handshake suite executing the shipped boot.cmd. I2 is pending provisioned production trust anchors and on-board tampered-bundle/rollback negative suites, which this tree does not carry. CONFIG_FIT_SIGNATURE is configured nowhere (docs/design/boards.md section 8), so nothing left of the verity root is verified and no claim above I1 is made.",
+  "qualification": "Verity-protected root is evidenced against the assembled image by the verify suite, A/B fallback by the host-side U-Boot sandbox handshake suite executing the shipped boot.cmd, and wrong-key/tampered-bundle refusal by the host-side negative suite. I2 waits for provisioned production trust anchors and on-board runs of both the A/B-fallback and negative suites. CONFIG_FIT_SIGNATURE is configured nowhere (docs/design/boards.md section 8), so nothing left of the verity root is verified and no claim above I1 is made.",
   "evidenceRefs": [
     {
       "class": "verity-root",
@@ -12,6 +12,10 @@
     {
       "class": "ab-fallback",
       "ref": "make os-uboot-handshake-test (tests/handshake-test/)"
+    },
+    {
+      "class": "update-negative",
+      "ref": "bash tests/rauc-trust-negative-test.sh (wrong-key / tampered-bundle refusal suite, host-side)"
     }
   ],
   "physicalBoundaries": {
