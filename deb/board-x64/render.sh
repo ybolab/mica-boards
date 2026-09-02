@@ -24,7 +24,7 @@
 # owner. The two overlay templates have no such renderer -- build.sh renders
 # them inline, in the middle of a build that also stages an image -- so their
 # rules are restated here: the same lowercased PARTUUIDs, the same VAR_OPTS,
-# the same /srv line, and the same refusal to emit a file with a placeholder
+# the same /mnt/data line, and the same refusal to emit a file with a placeholder
 # left in it.
 set -euo pipefail
 
@@ -96,10 +96,10 @@ MOS_BOARD="${BOARD}" SYSTEM_CONF_OUT="${OUT}/system.conf" bash "${RENDER_CONFIG}
 [ -s "${OUT}/system.conf" ] ||
     die "${RENDER_CONFIG} produced no system.conf for ${BOARD}"
 
-# /srv is the only filesystem that grows and /var must NOT carry
+# /mnt/data is the only filesystem that grows and /var must NOT carry
 # x-systemd.growfs: it is fixed-size disposable residue. Tab-separated, the
 # shape build.sh emits, so the two renderings can be compared byte for byte.
-printf -v SRV_LINE 'PARTUUID=%s\t/srv\text4\tnoatime,x-systemd.growfs\t0\t2' \
+printf -v DATA_LINE 'PARTUUID=%s\t/mnt/data\text4\tnoatime,x-systemd.growfs\t0\t2' \
     "$(lower "${DATA_GUID}")"
 VAR_OPTS="noatime"
 
@@ -108,7 +108,7 @@ render "${FSTAB_IN}" "${OUT}/fstab" \
     STATE_GUID "$(lower "${STATE_GUID}")" \
     META_GUID "$(lower "${META_GUID}")" \
     VAR_OPTS "${VAR_OPTS}" \
-    SRV_LINE "${SRV_LINE}"
+    DATA_LINE "${DATA_LINE}"
 
 # No /etc/fw_env.config, and its absence is the statement: there is no U-Boot
 # on this board, and that template names two partitions boards/x64/board.env
