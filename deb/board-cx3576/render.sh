@@ -212,7 +212,7 @@ cp "${LAYOUT_ENV}" "${STAGE}/board.env"
 
 # The rendering, exactly as rootfs/build.sh does it. lower() and render()
 # are that script's, including the refusal to emit a file with a placeholder
-# left in it; SRV_LINE and VAR_OPTS are its values.
+# left in it; DATA_LINE and VAR_OPTS are its values.
 #
 # PARTUUIDs are lowercased because udev derives /dev/disk/by-partuuid/ from
 # libblkid's lowercase GUID formatting and systemd's fstab-generator resolves
@@ -236,14 +236,14 @@ render() {
 }
 
 OVERLAY_SRC="${REPO_ROOT}/rootfs/overlay"
-SRV_LINE="PARTUUID=$(lower "${DATA_GUID}")	/srv	ext4	noatime,x-systemd.growfs	0	2"
+DATA_LINE="PARTUUID=$(lower "${DATA_GUID}")	/mnt/data	ext4	noatime,x-systemd.growfs	0	2"
 VAR_OPTS="noatime"
 render "${OVERLAY_SRC}/etc/fstab.in" "${STAGE}/etc/fstab" \
     EPHEMERAL_GUID "$(lower "${EPHEMERAL_GUID}")" \
     STATE_GUID "$(lower "${STATE_GUID}")" \
     META_GUID "$(lower "${META_GUID}")" \
     VAR_OPTS "${VAR_OPTS}" \
-    SRV_LINE "${SRV_LINE}"
+    DATA_LINE "${DATA_LINE}"
 render "${OVERLAY_SRC}/etc/fw_env.config.in" "${STAGE}/etc/fw_env.config" \
     UENV_A_GUID "$(lower "${UENV_A_GUID}")" \
     UENV_B_GUID "$(lower "${UENV_B_GUID}")" \
