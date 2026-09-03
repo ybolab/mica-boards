@@ -83,7 +83,7 @@ RUN cd /ksrc && \
     # netfilter sets, VETH, BRIDGE, the NFT_FIB family. Those are facts about
     # the ENGINE rather than about this board, and they were asserted here only
     # because x64 ran Debian's kernel, where every one of them is =m and no
-    # shared floor could require them. Since PLAN-073 x64 builds its own, so
+    # shared floor could require them. Since PLAN-074 x64 builds its own, so
     # they live in boards/common/mos-required.fragment and the loop below this
     # one asserts them on both boards.
     #
