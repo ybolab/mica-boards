@@ -156,6 +156,21 @@ RUN set -eu; cd /ksrc; \
         echo "error: the resolved config's LSM list is not the required one. Wanted ${want}, got $(grep '^CONFIG_LSM=' .config). SELinux that is compiled in but not in the boot list never registers selinuxfs, and the image ships a security module that is present and does nothing." >&2; exit 1; }; \
     echo "config: ${want}"
 
+# ONE ENTRY OF THAT LIST IS NOT SATISFIED, ON EITHER BOARD, and it is recorded
+# here rather than quietly fixed. The list ends in `bpf`, and neither this
+# kernel nor cx3576's vendor kernel sets CONFIG_BPF_LSM -- so systemd says
+# "bpf-restrict-fs: BPF LSM hook not enabled in the kernel, BPF LSM not
+# supported" at every boot on both. Debian's amd64 kernel DID have it, so this
+# board lost a capability by leaving that kernel; what it gained is agreement
+# with the board that actually ships, which is the whole point of x64.
+#
+# Not switched on here, deliberately: adding it to this board alone would
+# re-create the divergence, and adding it to the shared floor would require it
+# of a vendor tree nothing in this session can build and boot. Nothing in this
+# tree uses RestrictFileSystems=, which is what the hook is for, so the cost
+# today is one journal line. PLAN-073 section 7c has the measurement; whoever
+# owns the LSM floor decides.
+
 # ASSERTION 4: no initramfs is required to reach the root.
 #
 # This is the whole reason the board builds its own kernel, so it is asserted
