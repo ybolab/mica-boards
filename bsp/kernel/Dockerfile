@@ -78,34 +78,43 @@ RUN cd /ksrc && \
     grep -q '^# CONFIG_WL_ROCKCHIP is not set' .config && \
     ! grep -q '^CONFIG_AP6XXX=' .config && \
     ! grep -q '^CONFIG_BCMDHD=' .config && \
+    # THE BOARD'S OWN OPTIONS, and only those. This loop used to carry the
+    # whole container-network floor too -- CGROUP_BPF, the nftables and
+    # netfilter sets, VETH, BRIDGE, the NFT_FIB family. Those are facts about
+    # the ENGINE rather than about this board, and they were asserted here only
+    # because x64 ran Debian's kernel, where every one of them is =m and no
+    # shared floor could require them. Since PLAN-073 x64 builds its own, so
+    # they live in boards/common/mos-required.fragment and the loop below this
+    # one asserts them on both boards.
+    #
+    # What stays is what is true of THIS hardware: an RK3576 with a USB gadget
+    # controller and a gadget serial console, and eMMC/USB storage. A QEMU
+    # machine has none of it, which is why moving these would be requiring a
+    # board to have hardware it does not.
     for option in \
         USB_OTG USB_DWC3 USB_DWC3_DUAL_ROLE \
         USB_GADGET USB_LIBCOMPOSITE USB_U_SERIAL USB_F_ACM \
         USB_CONFIGFS USB_CONFIGFS_ACM CONFIGFS_FS \
-        USB_HID HID_GENERIC INPUT_EVDEV USB_STORAGE SCSI BLK_DEV_SD \
-        CGROUP_BPF VETH BRIDGE BRIDGE_NETFILTER \
-        NF_CONNTRACK NF_CONNTRACK_MARK NF_NAT NF_NAT_MASQUERADE \
-        NF_TABLES NF_TABLES_INET NF_TABLES_IPV4 NF_TABLES_IPV6 \
-        NFT_CT NFT_MASQ NFT_NAT NFT_COMPAT \
-        NFT_FIB NFT_FIB_IPV4 NFT_FIB_IPV6 NFT_FIB_INET \
-        NETFILTER_XTABLES NETFILTER_XT_MATCH_ADDRTYPE \
-        NETFILTER_XT_MATCH_CONNTRACK NETFILTER_XT_MARK \
-        NETFILTER_XT_TARGET_CHECKSUM NETFILTER_XT_TARGET_CT \
-        NETFILTER_XT_TARGET_MASQUERADE NETFILTER_XT_TARGET_REDIRECT \
-        IP_NF_FILTER IP_NF_MANGLE IP_NF_RAW IP_NF_NAT \
-        IP6_NF_IPTABLES IP6_NF_FILTER IP6_NF_MANGLE IP6_NF_RAW \
-        IP6_NF_NAT IP6_NF_TARGET_MASQUERADE; do \
+        USB_HID HID_GENERIC INPUT_EVDEV USB_STORAGE SCSI BLK_DEV_SD; do \
         grep -q "^CONFIG_${option}=y" .config || { \
-            echo "missing Docker kernel option: CONFIG_${option}=y" >&2; \
+            echo "missing cx3576 board kernel option: CONFIG_${option}=y" >&2; \
             exit 1; \
         }; \
     done && \
+    n=0; \
     for line in $(sed -n 's/^\(CONFIG_[A-Z0-9_]*=y\)$/\1/p' /mos-required.fragment); do \
+        n=$((n + 1)); \
         grep -q "^${line}$" .config || { \
             echo "missing mos-required option: ${line}" >&2; \
             exit 1; \
         }; \
-    done
+    done; \
+    # The count, because this loop grew: it now carries the container-network
+    # floor the board loop above used to restate, and a fragment that failed to
+    # arrive would make it iterate zero times and report nothing. An assertion
+    # over an empty list is green whatever the kernel does.
+    [ "$n" -gt 0 ] || { echo "zero =y lines were read from /mos-required.fragment; the shared floor asserted nothing" >&2; exit 1; }; \
+    echo "config: all ${n} mos-required options are set"
 
 RUN cd /ksrc && \
     make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)" Image modules && \
