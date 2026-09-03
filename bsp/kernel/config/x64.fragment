@@ -165,6 +165,21 @@ CONFIG_BLK_DEV_LOOP=y
 # a write nothing acts on until the next reboot.
 CONFIG_BLOCK_LEGACY_AUTOLOAD=y
 
+# --- parents the shared floor needs and x86_64_defconfig does not set --------
+# CONFIG_NETFILTER_ADVANCED gates a whole submenu, and the floor's
+# CONFIG_BRIDGE_NETFILTER sits inside it: `depends on NETFILTER_ADVANCED`. With
+# the parent off, olddefconfig does not report the child as `is not set` -- it
+# drops the symbol from the config entirely, which is how a required option
+# goes missing with no line to point at. The x64 kernel build caught exactly
+# that on the merge with PLAN-073's floor, naming CONFIG_BRIDGE_NETFILTER.
+#
+# HERE AND NOT IN THE SHARED FLOOR, deliberately. This is not something the
+# product requires; it is what this board's STARTING POINT happens to leave
+# off. cx3576's vendor config has both parents set already, so putting them in
+# boards/common/ would be asserting a defconfig quirk on every future board.
+CONFIG_NETFILTER=y
+CONFIG_NETFILTER_ADVANCED=y
+
 # --- crypto the boot path uses ----------------------------------------------
 # dm-verity's hash algorithm is sha256 (rootfs/build.sh writes it into the
 # table as HASH_ALGO), and it is asked for through the crypto API before any

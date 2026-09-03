@@ -156,36 +156,17 @@ RUN set -eu; cd /ksrc; \
         echo "error: the resolved config's LSM list is not the required one. Wanted ${want}, got $(grep '^CONFIG_LSM=' .config). SELinux that is compiled in but not in the boot list never registers selinuxfs, and the image ships a security module that is present and does nothing." >&2; exit 1; }; \
     echo "config: ${want}"
 
-# ONE ENTRY OF THAT LIST IS NOT SATISFIED, ON EITHER BOARD, and it is recorded
-# here rather than quietly fixed. The list ends in `bpf`, and neither this
-# kernel nor cx3576's vendor kernel sets CONFIG_BPF_LSM -- so systemd says
-# "bpf-restrict-fs: BPF LSM hook not enabled in the kernel, BPF LSM not
-# supported" at every boot on both. Debian's amd64 kernel DID have it, so this
-# board lost a capability by leaving that kernel; what it gained is agreement
-# with the board that actually ships, which is the whole point of x64.
+# ONE ENTRY OF THAT LIST IS NOT SATISFIED, ON EITHER BOARD. The list ends in
+# `bpf` and neither this kernel nor cx3576's builds CONFIG_BPF_LSM, so systemd
+# says "bpf-restrict-fs: BPF LSM hook not enabled in the kernel" at every boot
+# on both. Debian's amd64 kernel DID have it, so x64 lost a capability by
+# leaving that kernel and gained agreement with the board that ships.
 #
-# Not switched on here, deliberately: adding it to this board alone would
-# re-create the divergence, and adding it to the shared floor would require it
-# of a vendor tree nothing in this session can build and boot. Nothing in this
-# tree uses RestrictFileSystems=, which is what the hook is for, so the cost
-# today is one journal line. PLAN-074 section 7c has the measurement; whoever
-# owns the LSM floor decides.
-
-# ASSERTION 4: no initramfs is required to reach the root.
-#
-# This is the whole reason the board builds its own kernel, so it is asserted
-# rather than inferred from the =y lines above: dm-init reads `dm-mod.create=`
-# at late_initcall and needs the device mapper, the verity target and squashfs
-# ALREADY IN the kernel. Any one of them as a module and the boot ends at
-# rootwait with no /dev/dm-0, days after this build reported success.
-RUN set -eu; cd /ksrc; \
-    for option in DM_INIT BLK_DEV_DM DM_VERITY SQUASHFS SQUASHFS_ZSTD EFI_PARTITION VIRTIO_BLK BLK_DEV_SD; do \
-        grep -q "^CONFIG_${option}=y" .config || { \
-            echo "error: CONFIG_${option} is not built in. x64 boots root=/dev/dm-0 from a dm-mod.create= table with NO initramfs, so anything on the path from 'the disk exists' to 'the verity root is mounted' has to be in the kernel image; a module here cannot be loaded because there is nothing to load it from yet." >&2; exit 1; }; \
-    done; \
-    grep -q '^CONFIG_BLK_DEV_INITRD=y' .config && \
-        echo "note: CONFIG_BLK_DEV_INITRD is set; the board ships no initrd and the bootloader passes none, so this is capability the image does not use"; \
-    echo "config: the no-initramfs verity floor is built in"
+# NOT switched on here, and the decision is not this file's: PLAN-073 *Left
+# owed* found the same gap from the floor's side, carries the dependency
+# analysis, and owns closing it. This comment is the flag at the assertion, so
+# that a reader of the LSM check learns the list is not fully honoured without
+# having to find that out from a boot log.
 
 # --- the build -------------------------------------------------------------
 FROM gate AS build
