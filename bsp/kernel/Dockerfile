@@ -78,24 +78,32 @@ RUN cd /ksrc && \
     grep -q '^# CONFIG_WL_ROCKCHIP is not set' .config && \
     ! grep -q '^CONFIG_AP6XXX=' .config && \
     ! grep -q '^CONFIG_BCMDHD=' .config && \
-    # THE BOARD'S OWN OPTIONS, and only those. This loop used to carry the
-    # whole container-network floor too -- CGROUP_BPF, the nftables and
-    # netfilter sets, VETH, BRIDGE, the NFT_FIB family. Those are facts about
-    # the ENGINE rather than about this board, and they were asserted here only
-    # because x64 ran Debian's kernel, where every one of them is =m and no
-    # shared floor could require them. Since PLAN-074 x64 builds its own, so
-    # they live in boards/common/mos-required.fragment and the loop below this
-    # one asserts them on both boards.
+    # THE BOARD'S OWN OPTIONS, AND THE FIREWALL REMAINDER THE SHARED FLOOR
+    # DOES NOT CARRY. This loop used to restate 19 symbols that
+    # boards/common/mos-required.fragment now pins -- BRIDGE, VETH, the
+    # NF_TABLES and NFT_* core, CGROUP_BPF and the NFT_FIB family -- and the
+    # fragment loop below asserts every one of them against the same built
+    # .config, on both boards. Two lists free to disagree are one list that is
+    # not enforced, so the duplicates are gone and what is left is what the
+    # fragment deliberately does not carry:
     #
-    # What stays is what is true of THIS hardware: an RK3576 with a USB gadget
-    # controller and a gadget serial console, and eMMC/USB storage. A QEMU
-    # machine has none of it, which is why moving these would be requiring a
-    # board to have hardware it does not.
+    #   * this hardware -- an RK3576 with a USB gadget controller and a gadget
+    #     serial console, and eMMC/USB storage. A QEMU machine has none of it.
+    #   * the legacy IP_NF_*/IP6_NF_* back-end and the per-extension xt matches
+    #     and targets, which PLAN-073 excluded from the shared floor as policy
+    #     rather than floor. They stay asserted HERE because this board has
+    #     always had them and dropping them silently is the regression this
+    #     reduction could most easily have introduced.
     for option in \
-        USB_OTG USB_DWC3 USB_DWC3_DUAL_ROLE \
-        USB_GADGET USB_LIBCOMPOSITE USB_U_SERIAL USB_F_ACM \
-        USB_CONFIGFS USB_CONFIGFS_ACM CONFIGFS_FS \
-        USB_HID HID_GENERIC INPUT_EVDEV USB_STORAGE SCSI BLK_DEV_SD; do \
+        BLK_DEV_SD CONFIGFS_FS HID_GENERIC INPUT_EVDEV \
+        SCSI USB_CONFIGFS USB_CONFIGFS_ACM USB_DWC3 \
+        USB_DWC3_DUAL_ROLE USB_F_ACM USB_GADGET USB_HID \
+        USB_LIBCOMPOSITE USB_OTG USB_STORAGE USB_U_SERIAL \
+        IP6_NF_FILTER IP6_NF_IPTABLES IP6_NF_MANGLE IP6_NF_NAT \
+        IP6_NF_RAW IP6_NF_TARGET_MASQUERADE IP_NF_FILTER IP_NF_MANGLE \
+        IP_NF_NAT IP_NF_RAW NETFILTER_XT_MARK NETFILTER_XT_MATCH_ADDRTYPE \
+        NETFILTER_XT_MATCH_CONNTRACK NETFILTER_XT_TARGET_CHECKSUM NETFILTER_XT_TARGET_CT NETFILTER_XT_TARGET_MASQUERADE \
+        NETFILTER_XT_TARGET_REDIRECT NF_CONNTRACK_MARK NF_NAT_MASQUERADE; do \
         grep -q "^CONFIG_${option}=y" .config || { \
             echo "missing cx3576 board kernel option: CONFIG_${option}=y" >&2; \
             exit 1; \
@@ -109,10 +117,10 @@ RUN cd /ksrc && \
             exit 1; \
         }; \
     done; \
-    # The count, because this loop grew: it now carries the container-network
-    # floor the board loop above used to restate, and a fragment that failed to
-    # arrive would make it iterate zero times and report nothing. An assertion
-    # over an empty list is green whatever the kernel does.
+    # The count, because this loop is now the ONLY assertion for the 19 symbols
+    # the board loop above stopped restating. A fragment that failed to arrive
+    # would make it iterate zero times and report nothing; an assertion over an
+    # empty list is green whatever the kernel does.
     [ "$n" -gt 0 ] || { echo "zero =y lines were read from /mos-required.fragment; the shared floor asserted nothing" >&2; exit 1; }; \
     echo "config: all ${n} mos-required options are set"
 
