@@ -1,6 +1,6 @@
 # The build context is this producer's own directory, and this producer needs
 # NOTHING out of it. Its payload comes from the board directory, the shared
-# overlay, the initramfs sources and pkgs/rauc, all of which arrive as named
+# overlay and pkgs/rauc, all of which arrive as named
 # build contexts (see producer.env's BUILD_CONTEXTS), and the packer arrives as
 # the `packer` context the driver passes itself.
 #

@@ -1,0 +1,52 @@
+# Build the x64 kernel.
+#
+# There is no U-Boot and no rootfs target here, and that is the difference from
+# boards/cx3576/bsp: a UEFI machine's firmware provides the boot chain, so the
+# only thing this board compiles is its kernel. boards/x64/board.env used to
+# say there was no BSP behind this board at all; that stopped being true with
+# PLAN-073, and the layout file says so now.
+.PHONY: all kernel kernel-config clean
+
+# EVERY BASE IMAGE COMES FROM build-env/images.env. The Dockerfile declares its
+# FROM argument with NO default, so a recipe that forgot to pass one fails at
+# `docker buildx build` with "base name should not be blank" rather than
+# building against a floating tag.
+#
+# Called in the recipe and not assigned with $(shell ...), for the reason
+# boards/cx3576/bsp/Makefile gives at length: a `:=` assignment runs the
+# command while make PARSES the file, discards its exit status and its stderr,
+# and leaves the variable empty on failure. Inside a recipe the `&&`
+# short-circuits and make stops with from.sh's own message.
+FROM_SH := ../../../build-env/from.sh
+UBUNTU_ARG := MOS_IMAGE_UBUNTU_2404=IMAGE_UBUNTU_2404
+
+all: kernel
+
+# The kernel, its modules, the config it was built from and its release string.
+# --build-context mos-common is not optional: the Dockerfile COPYs the shared
+# floor from it and fails loudly without it, which is what stops a kernel from
+# being built against a fragment nobody merged.
+kernel:
+	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
+	docker buildx build --build-context mos-common=../../common \
+	  -f kernel/Dockerfile --target artifact $$IMG \
+	  $(if $(KERNEL_BUILDER),--builder $(KERNEL_BUILDER)) \
+	  -o out/kernel .
+	@ls -la out/kernel/
+
+# Re-record config/x64.config from the fragments and the pinned source.
+#
+# It writes into the source tree on purpose. The recorded config IS a source
+# file -- it is the reviewed build input, and the `kernel` target above refuses
+# a build whose resolution differs from it -- so refreshing it is an edit that
+# gets committed and read in a diff, which is the entire mechanism.
+kernel-config:
+	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
+	docker buildx build --build-context mos-common=../../common \
+	  -f kernel/Dockerfile --target config $$IMG \
+	  $(if $(KERNEL_BUILDER),--builder $(KERNEL_BUILDER)) \
+	  -o kernel/config .
+	@echo "recorded: kernel/config/x64.config ($$(grep -c . kernel/config/x64.config) lines)"
+
+clean:
+	rm -rf out

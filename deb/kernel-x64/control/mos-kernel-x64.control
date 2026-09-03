@@ -1,0 +1,30 @@
+Package: mos-kernel-x64
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: mos build <mos@example.invalid>
+Section: kernel
+Priority: optional
+Description: mos kernel -- x64 (linux 6.12 LTS, configured for the verity boot)
+ The Linux kernel the x64 board boots, built from the tag pinned in
+ boards/x64/bsp/kernel/versions.env against the configuration recorded in
+ boards/x64/bsp/kernel/config/. It ships /boot/vmlinuz-<release>, the
+ /boot/config-<release> it was built from, and /usr/lib/modules/<release>/.
+ .
+ It replaces Debian's linux-image-amd64, and the reason is the boot path rather
+ than size. Debian's generic kernel has no CONFIG_DM_INIT, so the
+ dm-mod.create= verity table on the kernel command line was ignored on this
+ board and an initramfs had to re-implement it -- a second reader of a contract
+ cx3576's kernel reads directly. This kernel carries the device mapper, the
+ dm-verity target and squashfs built in, so the root is assembled before the
+ mount and the board ships no initrd at all.
+ .
+ It is NOT a generic distribution kernel and does not try to be. It carries
+ virtio, AHCI, NVMe and USB mass storage for the root device and the virtio,
+ Intel and Realtek network drivers, and nothing else: 4587 recorded config
+ lines against Debian's 6673, and no wireless, sound, DRM or media stack, for a
+ board whose declared role is the QEMU and CI baseline.
+ .
+ No Depends: the payload is a kernel image and its modules, and nothing in it
+ links a shared library. It is not the boot chain either -- a UEFI machine's
+ firmware and GRUB provide that -- so nothing is enabled and nothing runs at
+ install time.
