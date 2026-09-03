@@ -13,7 +13,7 @@ Description: mos board support -- x64 (QEMU/UEFI, A/B layout)
  so a device copy would be an unrendered template nothing reads.
  .
  There is no vendor boot chain behind this board -- a UEFI machine's firmware
- provides it -- but the KERNEL is this repository's since PLAN-073, built by
+ provides it -- but the KERNEL is this repository's since PLAN-074, built by
  boards/x64/bsp and packaged as mos-kernel-x64, which this package depends on.
  It replaced Debian's linux-image-amd64 together with the entire initramfs
  apparatus: that kernel had no CONFIG_DM_INIT, so the dm-mod.create= verity

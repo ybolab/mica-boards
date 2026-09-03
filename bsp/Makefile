@@ -4,7 +4,7 @@
 # boards/cx3576/bsp: a UEFI machine's firmware provides the boot chain, so the
 # only thing this board compiles is its kernel. boards/x64/board.env used to
 # say there was no BSP behind this board at all; that stopped being true with
-# PLAN-073, and the layout file says so now.
+# PLAN-074, and the layout file says so now.
 .PHONY: all kernel kernel-config clean
 
 # EVERY BASE IMAGE COMES FROM build-env/images.env. The Dockerfile declares its

@@ -13,7 +13,7 @@
 # config, while a layout change moves board.env, and the two are visible apart
 # in /usr/share/mos/manifest.tsv.
 #
-# THERE IS NO INITRAMFS ON THIS BOARD, since PLAN-073. This producer used to
+# THERE IS NO INITRAMFS ON THIS BOARD, since PLAN-074. This producer used to
 # ship /etc/initramfs-tools/hooks/mos-verity and a local-top script, because
 # Debian's generic kernel has no CONFIG_DM_INIT and ignored the dm-mod.create=
 # verity table the boot contract puts on the kernel command line -- so an initrd

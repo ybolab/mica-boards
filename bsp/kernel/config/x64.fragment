@@ -82,7 +82,7 @@ CONFIG_NLS_UTF8=y
 # virtio for QEMU; the Intel and Realtek families for everything else. These
 # four cover essentially every industrial x86 board sold, and they are the
 # whole claim: this kernel is not Debian's and does not boot arbitrary
-# hardware. PLAN-073 section 6 records that trade and what would reverse it.
+# hardware. PLAN-074 section 6 records that trade and what would reverse it.
 CONFIG_VIRTIO_NET=y
 CONFIG_E1000=y
 CONFIG_E1000E=y

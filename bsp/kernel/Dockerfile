@@ -10,7 +10,7 @@
 # rootfs/build.sh writes was silently ignored on this board and an initramfs
 # had to re-implement it -- a second reader of the one boot contract, which is
 # what made every x64 image unbootable for the length of one commit while
-# cx3576, whose kernel takes the same cmdline directly, stayed green. PLAN-073
+# cx3576, whose kernel takes the same cmdline directly, stayed green. PLAN-074
 # carries the measurements and the decision.
 
 # The builder image, injected from build-env/images.env by build-env/from.sh,
@@ -148,7 +148,7 @@ RUN set -eu; cd /ksrc; n=0; \
 # never registers selinuxfs, so the image ships a security module that is
 # present and inactive. Debian's amd64 kernel carries a DIFFERENT string
 # (...,apparmor,selinux,smack,tomoyo,bpf,ipe) and nothing ever compared them,
-# which is one of the measurements PLAN-073 was written from.
+# which is one of the measurements PLAN-074 was written from.
 RUN set -eu; cd /ksrc; \
     want="$(grep '^CONFIG_LSM=' /mos-required.fragment)"; \
     [ -n "${want}" ] || { echo "error: boards/common/mos-required.fragment declares no CONFIG_LSM, so this assertion has nothing to compare and would pass over anything" >&2; exit 1; }; \
@@ -168,7 +168,7 @@ RUN set -eu; cd /ksrc; \
 # re-create the divergence, and adding it to the shared floor would require it
 # of a vendor tree nothing in this session can build and boot. Nothing in this
 # tree uses RestrictFileSystems=, which is what the hook is for, so the cost
-# today is one journal line. PLAN-073 section 7c has the measurement; whoever
+# today is one journal line. PLAN-074 section 7c has the measurement; whoever
 # owns the LSM floor decides.
 
 # ASSERTION 4: no initramfs is required to reach the root.
