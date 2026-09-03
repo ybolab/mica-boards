@@ -174,6 +174,27 @@ RUN set -eu; cd /ksrc; \
 
 # --- the build -------------------------------------------------------------
 FROM gate AS build
+
+# The three strings the kernel stamps into its own image, pinned.
+#
+# Without them a bzImage carries the wall clock and the builder's hostname --
+# `#1 SMP PREEMPT_DYNAMIC Thu Sep 3 19:43:59 UTC 2026` and `root@buildkitsandbox`
+# -- so two builds of the identical pinned source differ, `uname -v` reports
+# when the machine's kernel happened to be compiled, and the composed-root
+# comparison gains a content difference at /boot/vmlinuz-* that no sanction
+# could honestly explain. This board just removed the ONE non-reproducible path
+# that gate had (the initrd, 182 of 183 cpio entries differing in inode number);
+# introducing another in the same change would be a poor trade.
+#
+# 1577836800 is 2020-01-01T00:00:00Z, the same constant boards/x64/board.env
+# pins as FILE_MTIME and E2FSPROGS_FAKE_TIME and the same one rootfs/build.sh
+# passes as SOURCE_DATE_EPOCH. One instant across every artefact this
+# repository produces, so a timestamp anywhere in an image is either that value
+# or a defect.
+ENV KBUILD_BUILD_TIMESTAMP="@1577836800" \
+    KBUILD_BUILD_USER=mos \
+    KBUILD_BUILD_HOST=mos-build
+
 RUN set -eu; cd /ksrc; \
     make -j"$(nproc)" bzImage modules; \
     make INSTALL_MOD_PATH=/kmods INSTALL_MOD_STRIP=1 modules_install; \

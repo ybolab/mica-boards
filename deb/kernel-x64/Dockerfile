@@ -67,7 +67,7 @@ RUN set -eu; \
     # A bzImage and not a vmlinux: GRUB's `linux` command loads the x86 boot \
     # protocol image, and an ELF here boots nothing while looking plausible. \
     case "$(file -b "/stage/boot/vmlinuz-${release}")" in \
-    *"Linux kernel x86 boot executable bzImage"*) ;; \
+    *"Linux kernel x86 boot executable, bzImage"*) ;; \
     *) echo "error: /boot/vmlinuz-${release} is not an x86 bzImage; file says: $(file -b "/stage/boot/vmlinuz-${release}"). GRUB's linux command would refuse it, or worse, load it and hand control to nothing" >&2; exit 1 ;; \
     esac; \
     # The no-initramfs floor, read off the config the image ships. This is the \
