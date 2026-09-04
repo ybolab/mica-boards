@@ -109,7 +109,7 @@ RUN cd /ksrc && \
         IP6_NF_RAW IP6_NF_TARGET_MASQUERADE IP_NF_FILTER IP_NF_MANGLE \
         IP_NF_NAT IP_NF_RAW NETFILTER_XT_MARK NETFILTER_XT_MATCH_ADDRTYPE \
         NETFILTER_XT_MATCH_CONNTRACK NETFILTER_XT_TARGET_CHECKSUM NETFILTER_XT_TARGET_CT NETFILTER_XT_TARGET_MASQUERADE \
-        NETFILTER_XT_TARGET_REDIRECT NF_CONNTRACK_MARK NF_NAT_MASQUERADE; do \
+        NETFILTER_XT_TARGET_REDIRECT; do \
         grep -q "^CONFIG_${option}=y" .config || { \
             echo "missing cx3576 board kernel option: CONFIG_${option}=y" >&2; \
             exit 1; \
@@ -123,7 +123,7 @@ RUN cd /ksrc && \
             exit 1; \
         }; \
     done; \
-    # The count, because this loop is now the ONLY assertion for the 19 symbols
+    # The count, because this loop is now the ONLY assertion for the 21 symbols
     # the board loop above stopped restating. A fragment that failed to arrive
     # would make it iterate zero times and report nothing; an assertion over an
     # empty list is green whatever the kernel does.
