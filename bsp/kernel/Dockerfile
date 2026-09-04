@@ -78,14 +78,13 @@ RUN cd /ksrc && \
     grep -q '^# CONFIG_WL_ROCKCHIP is not set' .config && \
     ! grep -q '^CONFIG_AP6XXX=' .config && \
     ! grep -q '^CONFIG_BCMDHD=' .config && \
-    # THE BOARD'S OWN OPTIONS, AND THE FIREWALL REMAINDER THE SHARED FLOOR
-    # DOES NOT CARRY. This loop used to restate 19 symbols that
-    # boards/common/mos-required.fragment now pins -- BRIDGE, VETH, the
-    # NF_TABLES and NFT_* core, CGROUP_BPF and the NFT_FIB family -- and the
-    # fragment loop below asserts every one of them against the same built
-    # .config, on both boards. Two lists free to disagree are one list that is
-    # not enforced, so the duplicates are gone and what is left is what the
-    # fragment deliberately does not carry:
+    # THE BOARD'S OWN OPTIONS, AND NOTHING ELSE. This loop used to restate 19
+    # symbols that boards/common/mos-required.fragment now pins -- BRIDGE,
+    # VETH, the NF_TABLES and NFT_* core, CGROUP_BPF and the NFT_FIB family --
+    # and the fragment loop below asserts every one of them against the same
+    # built .config, on both boards. Two lists free to disagree are one list
+    # that is not enforced, so the duplicates are gone and what is left is what
+    # no shared floor could state:
     #
     #   * this hardware -- an RK3576 with a USB gadget controller and a gadget
     #     serial console, and eMMC/USB storage. A QEMU machine has none of it.
@@ -94,22 +93,27 @@ RUN cd /ksrc && \
     #     capability rather than a feature; CE_BLK is this architecture's fast
     #     path for it and exists on no other, which is why the floor cannot
     #     name it. x64 carries CRYPTO_AES_NI_INTEL for the same reason.
-    #   * the legacy IP_NF_*/IP6_NF_* back-end and the per-extension xt matches
-    #     and targets, which PLAN-073 excluded from the shared floor as policy
-    #     rather than floor. They stay asserted HERE because this board has
-    #     always had them and dropping them silently is the regression this
-    #     reduction could most easily have introduced.
+    #
+    # THE FIREWALL REMAINDER IS GONE FROM HERE TOO, and it left by two
+    # different routes (RFCT-304). The seven xt matches and targets moved into
+    # the shared fragment, because the measurement made them an
+    # engine-and-tooling fact rather than policy: the shipped iptables stores
+    # every extension as an nft_compat `xt` expression, and on a kernel without
+    # the module the rule is refused outright. They were =y here and absent or
+    # =m on x64, which is why `iptables -j REDIRECT` worked on this board and
+    # not on that one. The ten legacy IP_NF_*/IP6_NF_* entries are simply gone:
+    # iptables-nft builds its raw and nat tables in nf_tables and needs none of
+    # them -- measured, on a kernel with IP_NF_RAW unset, `iptables -t raw -A
+    # PREROUTING -j ACCEPT` succeeds and stores a native rule -- and the only
+    # front-end that does need them is iptables-legacy, which nothing in this
+    # tree selects. Asserting them here made this board's legacy surface look
+    # like a requirement when it is a leftover of the vendor config.
     for option in \
         BLK_DEV_SD CONFIGFS_FS HID_GENERIC INPUT_EVDEV \
         SCSI USB_CONFIGFS USB_CONFIGFS_ACM USB_DWC3 \
         USB_DWC3_DUAL_ROLE USB_F_ACM USB_GADGET USB_HID \
         USB_LIBCOMPOSITE USB_OTG USB_STORAGE USB_U_SERIAL \
-        CRYPTO_AES_ARM64_CE_BLK \
-        IP6_NF_FILTER IP6_NF_IPTABLES IP6_NF_MANGLE IP6_NF_NAT \
-        IP6_NF_RAW IP6_NF_TARGET_MASQUERADE IP_NF_FILTER IP_NF_MANGLE \
-        IP_NF_NAT IP_NF_RAW NETFILTER_XT_MARK NETFILTER_XT_MATCH_ADDRTYPE \
-        NETFILTER_XT_MATCH_CONNTRACK NETFILTER_XT_TARGET_CHECKSUM NETFILTER_XT_TARGET_CT NETFILTER_XT_TARGET_MASQUERADE \
-        NETFILTER_XT_TARGET_REDIRECT; do \
+        CRYPTO_AES_ARM64_CE_BLK; do \
         grep -q "^CONFIG_${option}=y" .config || { \
             echo "missing cx3576 board kernel option: CONFIG_${option}=y" >&2; \
             exit 1; \
@@ -123,7 +127,7 @@ RUN cd /ksrc && \
             exit 1; \
         }; \
     done; \
-    # The count, because this loop is now the ONLY assertion for the 21 symbols
+    # The count, because this loop is now the ONLY assertion for the 28 symbols
     # the board loop above stopped restating. A fragment that failed to arrive
     # would make it iterate zero times and report nothing; an assertion over an
     # empty list is green whatever the kernel does.
