@@ -134,6 +134,24 @@ RUN cd /ksrc && \
     [ "$n" -gt 0 ] || { echo "zero =y lines were read from /mos-required.fragment; the shared floor asserted nothing" >&2; exit 1; }; \
     echo "config: all ${n} mos-required options are set"
 
+# The three strings the kernel stamps into its own image, pinned -- the same
+# three values boards/x64/bsp/kernel/Dockerfile pins, for the same reason, and
+# not a second convention.
+#
+# Without them the Image carries the wall clock and the builder's hostname
+# (`#1 SMP ... <date>` and `root@buildkitsandbox`), so two builds of one
+# unchanged tree differ. RFCT-304 measured exactly that on this board: equal
+# size, different sha256, and had to compare the kernel by size because of it.
+#
+# 1577836800 is 2020-01-01T00:00:00Z, the constant boards/cx3576/board.env pins
+# as FILE_MTIME and E2FSPROGS_FAKE_TIME and rootfs/build.sh passes as
+# SOURCE_DATE_EPOCH. One instant across every artefact this repository
+# produces, so a timestamp anywhere in an image is either that value or a
+# defect.
+ENV KBUILD_BUILD_TIMESTAMP="@1577836800" \
+    KBUILD_BUILD_USER=mos \
+    KBUILD_BUILD_HOST=mos-build
+
 RUN cd /ksrc && \
     make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)" Image modules && \
     # The patch loop proves the series applied without rejects; these prove the
