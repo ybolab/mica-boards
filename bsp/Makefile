@@ -1,0 +1,57 @@
+# Build the virt-arm64 kernel.
+#
+# There is no U-Boot and no rootfs target here, which is the difference from
+# boards/cx3576/bsp and the similarity to boards/x64/bsp: this board's firmware
+# is AAVMF and it provides the boot chain, so the only thing compiled here is
+# the kernel. And the kernel IS compiled, rather than taken from Debian,
+# because the boot contract needs CONFIG_DM_INIT -- see kernel/versions.env.
+.PHONY: all kernel kernel-config clean
+
+# EVERY BASE IMAGE COMES FROM build-env/images.env. The Dockerfile declares its
+# FROM argument with NO default, so a recipe that forgot to pass one fails at
+# `docker buildx build` with "base name should not be blank" rather than
+# building against a floating tag.
+#
+# Called in the recipe and not assigned with $(shell ...), for the reason
+# boards/cx3576/bsp/Makefile gives at length: a `:=` assignment runs the
+# command while make PARSES the file, discards its exit status and its stderr,
+# and leaves the variable empty on failure. Inside a recipe the `&&`
+# short-circuits and make stops with from.sh's own message.
+FROM_SH := ../../../build-env/from.sh
+UBUNTU_ARG := MOS_IMAGE_UBUNTU_2404=IMAGE_UBUNTU_2404
+
+all: kernel
+
+# The kernel, its modules, the config it was built from and its release string.
+# --build-context mos-common is not optional: the Dockerfile COPYs the shared
+# floor from it and fails loudly without it, which is what stops a kernel from
+# being built against a fragment nobody merged.
+#
+# No --platform and no builder requirement: the Dockerfile pins its build stage
+# to $BUILDPLATFORM and cross-compiles with aarch64-linux-gnu-, so this runs
+# natively on an amd64 host and needs neither binfmt_misc nor the mos-arm64
+# docker-container builder.
+kernel:
+	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
+	docker buildx build --build-context mos-common=../../common \
+	  -f kernel/Dockerfile --target artifact $$IMG \
+	  $(if $(KERNEL_BUILDER),--builder $(KERNEL_BUILDER)) \
+	  -o out/kernel .
+	@ls -la out/kernel/
+
+# Re-record config/virt-arm64.config from the fragments and the pinned source.
+#
+# It writes into the source tree on purpose. The recorded config IS a source
+# file -- it is the reviewed build input, and the `kernel` target above refuses
+# a build whose resolution differs from it -- so refreshing it is an edit that
+# gets committed and read in a diff, which is the entire mechanism.
+kernel-config:
+	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
+	docker buildx build --build-context mos-common=../../common \
+	  -f kernel/Dockerfile --target config $$IMG \
+	  $(if $(KERNEL_BUILDER),--builder $(KERNEL_BUILDER)) \
+	  -o kernel/config .
+	@echo "recorded: kernel/config/virt-arm64.config ($$(grep -c . kernel/config/virt-arm64.config) lines)"
+
+clean:
+	rm -rf out

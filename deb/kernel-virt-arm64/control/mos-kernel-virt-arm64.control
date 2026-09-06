@@ -1,0 +1,37 @@
+Package: mos-kernel-virt-arm64
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: mos build <mos@example.invalid>
+Section: kernel
+Priority: optional
+Description: mos kernel -- virt-arm64 (linux 6.12 LTS, configured for the verity boot)
+ The Linux kernel the virt-arm64 board boots, built from the tag pinned in
+ boards/virt-arm64/bsp/kernel/versions.env against the configuration recorded
+ in boards/virt-arm64/bsp/kernel/config/. It ships /boot/vmlinuz-<release>, the
+ /boot/config-<release> it was built from, and /usr/lib/modules/<release>/.
+ .
+ It is built here rather than taken from Debian, and the reason is the boot
+ path rather than size. Debian's linux-image-arm64 has no CONFIG_DM_INIT, so
+ the dm-mod.create= verity table on the kernel command line would be accepted
+ and ignored, leaving no root at all -- and the usual repair is an initramfs
+ that re-parses the line GRUB just wrote, which is a second implementation of
+ the one boot contract. x64 shipped exactly that until PLAN-074. This kernel
+ carries the device mapper, the dm-verity target and squashfs built in, so the
+ root is assembled before the mount and the board ships no initrd.
+ .
+ It is NOT a generic distribution kernel and does not try to be, though it is
+ larger than x64's: 9328 recorded config lines against that board's 4589,
+ because arm64 has one `defconfig` covering every platform where x86 has
+ x86_64_defconfig. What the fragment beside it ADDS is small and specific --
+ virtio over PCIe for the root device and the network, the PL011 console the
+ `virt` machine actually has, GPT and the FAT/ext4 filesystems the layout
+ mounts. There is no wireless, sound, DRM or media stack in the image's
+ userland to drive.
+ .
+ The artifact is arch/arm64/boot/Image; it is installed as vmlinuz-<release>
+ because that is what boards/virt-arm64/board.env's SLOT_KERNEL_NAME says the
+ boot partition carries, and the same grub.cfg shape x64 uses reads that name.
+ .
+ No Depends: the payload is a kernel image and its modules, and nothing in it
+ links a shared library. It is not the boot chain either -- the firmware and
+ GRUB provide that -- so nothing is enabled and nothing runs at install time.

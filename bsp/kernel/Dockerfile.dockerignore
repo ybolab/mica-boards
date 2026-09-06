@@ -1,0 +1,4 @@
+# kernel project context allowlist (context = boards/virt-arm64/bsp)
+*
+!kernel/config/
+!kernel/versions.env

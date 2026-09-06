@@ -1,0 +1,29 @@
+Package: mos-board-virt-arm64
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: mos build <mos@example.invalid>
+Section: admin
+Priority: optional
+Depends: mos-system (= @VERSION@), mos-kernel-virt-arm64 (= @VERSION@), ${shlibs:Depends}
+Description: mos board support -- virt-arm64 (QEMU aarch64 virt, UEFI, A/B layout)
+ Everything the image carries because it is the virt-arm64 board: /etc/fstab
+ and the ESP mount unit rendered from boards/virt-arm64/board.env, the RAUC
+ system configuration for its grub backend, and /usr/bin/grub-editenv. The
+ ESP's own grub.cfg is not in here: the image assembler renders it from the
+ repository, so a device copy would be an unrendered template nothing reads.
+ .
+ The board is QEMU's aarch64 `virt` machine booted through AAVMF, the same
+ architecture the shipping device runs and the same UEFI + GRUB boot flow x64
+ uses. It exists so that arm64 claims can be made by RUNNING arm64 code:
+ cx3576 is arm64 and is real hardware, so before this board every arm64
+ assertion in the tree was either static or owed to a bench.
+ .
+ There is no vendor boot chain behind this board -- the firmware provides it --
+ but the KERNEL is this repository's, built by boards/virt-arm64/bsp and
+ packaged as mos-kernel-virt-arm64, which this package depends on. That is
+ forced rather than preferred: the boot contract is a dm-mod.create= verity
+ table on the kernel command line with no initrd, which needs CONFIG_DM_INIT,
+ and Debian's linux-image-arm64 does not set it.
+ .
+ grub-editenv's libdevmapper is not named here: it is an ELF dependency, so
+ ${shlibs:Depends} derives it, and with the version dpkg-shlibdeps reads.
