@@ -126,7 +126,7 @@ ARG SOURCE_DATE_EPOCH
 # NO GRUB CONFIGURATION IN THE PAYLOAD. This package once staged
 # boards/x64/grub.cfg at /usr/lib/mos/board/x64/grub.cfg, placeholders
 # intact, on the reasoning that image-assembly input travels with the board.
-# Nothing ever read it: build/src/mkimage-x64.ts renders the ESP copy from
+# Nothing ever read it: build/src/mkimage-uefi.ts renders the ESP copy from
 # the TREE path, boards/x64/grub.cfg, which is where the assembler runs and
 # where the file is version-controlled. The packaged copy was therefore an
 # unrendered template with @BOOT_A_PARTNUM@ and @ROOTFS_A_PARTUUID@ still in it,
