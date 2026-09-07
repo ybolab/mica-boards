@@ -48,9 +48,14 @@ ALPINE_ARG := MOS_IMAGE_ALPINE_3_24_1=IMAGE_ALPINE_3_24_1
 
 all: image
 
+# `--build-context bsp-scripts=scripts` is what lets the U-Boot target keep
+# `uboot` as its build context while still reading boards/cx3576/bsp/scripts/.
+# The kernel target's context is the board directory and reaches them with a
+# plain COPY; widening this one to match would put the committed Wi-Fi firmware
+# and the 9 MiB vendor MiniLoaderAll.bin into every U-Boot build's context.
 uboot:
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
-	docker buildx build -f uboot/Dockerfile $$IMG \
+	docker buildx build --build-context bsp-scripts=scripts -f uboot/Dockerfile $$IMG \
 	  $(if $(UBOOT_COMMIT),--build-arg UBOOT_COMMIT=$(UBOOT_COMMIT)) \
 	  $(if $(RKBIN_COMMIT),--build-arg RKBIN_COMMIT=$(RKBIN_COMMIT)) \
 	  -o $(BSP_OUT)/uboot uboot
@@ -59,7 +64,7 @@ uboot:
 # the mos image pipeline, while the debug variant above stays on alpine.
 uboot-mos:
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
-	docker buildx build -f uboot/Dockerfile --target artifact-mos $$IMG \
+	docker buildx build --build-context bsp-scripts=scripts -f uboot/Dockerfile --target artifact-mos $$IMG \
 	  $(if $(UBOOT_COMMIT),--build-arg UBOOT_COMMIT=$(UBOOT_COMMIT)) \
 	  $(if $(RKBIN_COMMIT),--build-arg RKBIN_COMMIT=$(RKBIN_COMMIT)) \
 	  -o $(BSP_OUT)/uboot-mos uboot

@@ -1,5 +1,8 @@
-# kernel project context allowlist (context = repo root)
+# kernel project context allowlist (context = boards/cx3576/bsp)
 *
+!scripts/
 !kernel/config/
 !kernel/patches/
 !kernel/dts/
+!kernel/configure.sh
+!kernel/build.sh

@@ -1,5 +1,13 @@
 # syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
 # Build Linux 6.1.115, modules, and the CX3576-Z device tree.
+#
+# ORCHESTRATION ONLY. Every step below is a file in this repository that a reader
+# can open on its own -- ../scripts/ for what the kernel and U-Boot builders
+# share, kernel/configure.sh for the resolved configuration and its floor, and
+# kernel/build.sh for the compile, the per-patch assertions and the packaging.
+# The vendor-source edits are kernel/patches/, listed in kernel/patches/series.
+# RFCT-345 moved them out of here and gated the move on the eleven BSP artefacts
+# coming back byte-identical.
 
 # The builder image is injected from build-env/images.env by
 # build-env/from.sh, which boards/cx3576/bsp/Makefile calls. A bare tag like
@@ -15,125 +23,33 @@
 ARG MOS_IMAGE_UBUNTU_2404
 FROM --platform=$BUILDPLATFORM ${MOS_IMAGE_UBUNTU_2404} AS build
 
+COPY scripts/ /bsp/scripts/
+
+# The package LIST stays here rather than in a file: it is what this builder is,
+# and it belongs beside the FROM that says which image it is installed into.
 ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN bash /bsp/scripts/apt-install.sh \
         git ca-certificates build-essential bc bison flex \
         libssl-dev libelf-dev python3 kmod patch \
-        gcc-aarch64-linux-gnu device-tree-compiler \
-    && rm -rf /var/lib/apt/lists/*
+        gcc-aarch64-linux-gnu device-tree-compiler
 
 ARG KERNEL_REPO=https://github.com/armbian/linux-rockchip.git
 ARG KERNEL_COMMIT=c6157104418d012823413c02f9222f3fe123dd25
-RUN git init -q /ksrc && \
-    git -C /ksrc remote add origin "${KERNEL_REPO}" && \
-    git -C /ksrc fetch --depth=1 origin "${KERNEL_COMMIT}" && \
-    git -C /ksrc checkout -q --detach FETCH_HEAD && \
-    test "$(git -C /ksrc rev-parse HEAD)" = "${KERNEL_COMMIT}"
+RUN bash /bsp/scripts/fetch-source.sh /ksrc "${KERNEL_REPO}" "${KERNEL_COMMIT}"
 
+# The .dts is copied in beside the patches, so the tree is coherent from the
+# moment patches/0004 registers the file in the rockchip dts Makefile.
 COPY kernel/patches/ /patches/
 COPY kernel/dts/rk3576-cx3576z.dts /ksrc/arch/arm64/boot/dts/rockchip/
-# A for loop's status is that of its last iteration and the old `ls
-# 2>/dev/null` glob made an empty or missing /patches a green zero-patch run —
-# so a reject in any patch but the last (or a lost COPY) still produced an
-# artifact built from a partially patched or unpatched tree. set -e aborts on
-# the first failing patch; the count pins the expected series length and must
-# move with kernel/patches/ whenever a patch is added or removed. Each patch's
-# effect is additionally asserted in the compiled tree after `make` below.
-RUN set -e; \
-    count=$(ls /patches/*.patch | wc -l); \
-    [ "$count" -eq 4 ] || { echo "ERROR: expected 4 kernel patches, found $count" >&2; exit 1; }; \
-    cd /ksrc && for p in $(ls /patches/*.patch | sort); do \
-        echo ">> applying $(basename "$p")" && patch -p1 --no-backup-if-mismatch < "$p"; \
-    done
+RUN bash /bsp/scripts/apply-patches.sh /ksrc /patches patch
 
-COPY kernel/config/kernel-cx3576z.config /ksrc/.config
-# Shared mos runtime baseline from boards/common/ — requires the named build
+# Shared mos runtime baseline from boards/common/ -- requires the named build
 # context: docker buildx build --build-context mos-common=../../common ...
 # (wired in the board Makefile; a bare build without it fails here, loudly).
+COPY kernel/config/kernel-cx3576z.config /ksrc/.config
 COPY --from=mos-common mos-required.fragment /mos-required.fragment
-
-ARG KERNEL_EXPECT=6.1.115
-RUN cd /ksrc && \
-    scripts/config --disable LOCALVERSION_AUTO \
-                   --disable WL_ROCKCHIP --disable WIFI_BUILD_MODULE \
-                   --disable AP6XXX --disable BCMDHD \
-                   --disable BCMDHD_SDIO --disable BCMDHD_PCIE \
-                   --enable RFKILL_RK \
-                   --enable RTC_DRV_HYM8563 \
-                   --enable LEDS_TRIGGERS \
-                   --enable LEDS_TRIGGER_HEARTBEAT \
-                   --set-str AIC_FW_PATH "/lib/firmware" && \
-    ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-        scripts/kconfig/merge_config.sh -m .config /mos-required.fragment && \
-    make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig && \
-    grep -q "^CONFIG_SQUASHFS_ZSTD=y" .config && \
-    grep -q "^CONFIG_OVERLAY_FS=y" .config && \
-    grep -q "^CONFIG_MEMCG=y" .config && \
-    grep -q "^CONFIG_FRAMEBUFFER_CONSOLE=y" .config && \
-    grep -q "^CONFIG_DRM_FBDEV_EMULATION=y" .config && \
-    grep -q "^CONFIG_AIC_WLAN_SUPPORT=y" .config && \
-    grep -q '^CONFIG_AIC_FW_PATH="/lib/firmware"' .config && \
-    grep -q '^CONFIG_RFKILL_RK=y' .config && \
-    grep -q '^CONFIG_RTC_DRV_HYM8563=y' .config && \
-    grep -q '^CONFIG_LEDS_TRIGGER_HEARTBEAT=y' .config && \
-    grep -q '^# CONFIG_WL_ROCKCHIP is not set' .config && \
-    ! grep -q '^CONFIG_AP6XXX=' .config && \
-    ! grep -q '^CONFIG_BCMDHD=' .config && \
-    # THE BOARD'S OWN OPTIONS, AND NOTHING ELSE. This loop used to restate 19
-    # symbols that boards/common/mos-required.fragment now pins -- BRIDGE,
-    # VETH, the NF_TABLES and NFT_* core, CGROUP_BPF and the NFT_FIB family --
-    # and the fragment loop below asserts every one of them against the same
-    # built .config, on both boards. Two lists free to disagree are one list
-    # that is not enforced, so the duplicates are gone and what is left is what
-    # no shared floor could state:
-    #
-    #   * this hardware -- an RK3576 with a USB gadget controller and a gadget
-    #     serial console, and eMMC/USB storage. A QEMU machine has none of it.
-    #   * the arm64 accelerated AES. The shared floor carries the generic
-    #     xts(aes) the crypt target resolves through and says why that is
-    #     capability rather than a feature; CE_BLK is this architecture's fast
-    #     path for it and exists on no other, which is why the floor cannot
-    #     name it. x64 carries CRYPTO_AES_NI_INTEL for the same reason.
-    #
-    # THE FIREWALL REMAINDER IS GONE FROM HERE TOO, and it left by two
-    # different routes (RFCT-304). The seven xt matches and targets moved into
-    # the shared fragment, because the measurement made them an
-    # engine-and-tooling fact rather than policy: the shipped iptables stores
-    # every extension as an nft_compat `xt` expression, and on a kernel without
-    # the module the rule is refused outright. They were =y here and absent or
-    # =m on x64, which is why `iptables -j REDIRECT` worked on this board and
-    # not on that one. The ten legacy IP_NF_*/IP6_NF_* entries are simply gone:
-    # iptables-nft builds its raw and nat tables in nf_tables and needs none of
-    # them -- measured, on a kernel with IP_NF_RAW unset, `iptables -t raw -A
-    # PREROUTING -j ACCEPT` succeeds and stores a native rule -- and the only
-    # front-end that does need them is iptables-legacy, which nothing in this
-    # tree selects. Asserting them here made this board's legacy surface look
-    # like a requirement when it is a leftover of the vendor config.
-    for option in \
-        BLK_DEV_SD CONFIGFS_FS HID_GENERIC INPUT_EVDEV \
-        SCSI USB_CONFIGFS USB_CONFIGFS_ACM USB_DWC3 \
-        USB_DWC3_DUAL_ROLE USB_F_ACM USB_GADGET USB_HID \
-        USB_LIBCOMPOSITE USB_OTG USB_STORAGE USB_U_SERIAL \
-        CRYPTO_AES_ARM64_CE_BLK; do \
-        grep -q "^CONFIG_${option}=y" .config || { \
-            echo "missing cx3576 board kernel option: CONFIG_${option}=y" >&2; \
-            exit 1; \
-        }; \
-    done && \
-    n=0; \
-    for line in $(sed -n 's/^\(CONFIG_[A-Z0-9_]*=y\)$/\1/p' /mos-required.fragment); do \
-        n=$((n + 1)); \
-        grep -q "^${line}$" .config || { \
-            echo "missing mos-required option: ${line}" >&2; \
-            exit 1; \
-        }; \
-    done; \
-    # The count, because this loop is now the ONLY assertion for the 28 symbols
-    # the board loop above stopped restating. A fragment that failed to arrive
-    # would make it iterate zero times and report nothing; an assertion over an
-    # empty list is green whatever the kernel does.
-    [ "$n" -gt 0 ] || { echo "zero =y lines were read from /mos-required.fragment; the shared floor asserted nothing" >&2; exit 1; }; \
-    echo "config: all ${n} mos-required options are set"
+COPY kernel/configure.sh /bsp/kernel/configure.sh
+RUN bash /bsp/kernel/configure.sh /ksrc /mos-required.fragment
 
 # The three strings the kernel stamps into its own image, pinned -- the same
 # three values boards/x64/bsp/kernel/Dockerfile pins, for the same reason, and
@@ -175,65 +91,23 @@ RUN cd /ksrc && \
 # build-id following it. kernel/patches/0003 pins that one; the two together are
 # what make this kernel byte-reproducible.
 #
-# `-j"$(nproc)"` below was the other suspect and is NOT implicated: every
-# differing byte in both experiments was a date string or a hash of one, and
-# nothing about parallelism produces those. CONFIG_DEBUG_INFO was the third and
-# is not implicated either, for the same reason.
+# `-j"$(nproc)"` in kernel/build.sh was the other suspect and is NOT implicated:
+# every differing byte in both experiments was a date string or a hash of one,
+# and nothing about parallelism produces those. CONFIG_DEBUG_INFO was the third
+# and is not implicated either, for the same reason.
+#
+# THE ENV STAYS BELOW kernel/configure.sh AND ABOVE kernel/build.sh, where the
+# Dockerfile put it. Nothing in the configuration step reads the wall clock, and
+# moving the pins above it would change which layers see them for no measured
+# reason -- the artefacts these values exist to stabilise are all produced below.
 ENV KBUILD_BUILD_TIMESTAMP="@1577836800" \
     KBUILD_BUILD_USER=mos \
     KBUILD_BUILD_HOST=mos-build \
     SOURCE_DATE_EPOCH=1577836800
 
-RUN cd /ksrc && \
-    make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)" Image modules && \
-    # The patch loop proves the series applied without rejects; these prove the
-    # tree that was just compiled carries each patch's effect (one distinctive
-    # added line per patch, same shape as the uboot Dockerfile's post-build
-    # BOOT_LOADER/write_cache greps): 0001's yt8531_stock_init module param and
-    # 0002's AIC_WLAN_SUPPORT gate on the aic8800_sdio directory.
-    grep -qF 'module_param(yt8531_stock_init, bool, 0444);' drivers/net/phy/motorcomm.c && \
-    grep -qF 'obj-$(CONFIG_AIC_WLAN_SUPPORT) += aic8800_sdio/' drivers/net/wireless/Makefile && \
-    grep -qF 'BUILD_DATE=$(shell date -u -d' drivers/gpu/arm/mali400/mali/Kbuild && \
-    grep -qF 'dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3576-cx3576z.dtb' \
-        arch/arm64/boot/dts/rockchip/Makefile && \
-    grep -q '^CONFIG_LEDS_TRIGGER_HEARTBEAT=y' include/config/auto.conf && \
-    echo "kernel release: $(cat include/config/kernel.release)" && \
-    [ "$(cat include/config/kernel.release)" = "${KERNEL_EXPECT}" ] && \
-    make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-         INSTALL_MOD_PATH=/kmods INSTALL_MOD_STRIP=1 modules_install && \
-    # DETERMINISTIC ARCHIVE PARAMETERS, and this is a packaging fix rather than
-    # a compile one -- separable from the Image above and measured separately.
-    # RFCT-343 compared two modules.tar from two --no-cache builds: every member
-    # was byte-identical, the member ORDER was identical, and every header
-    # carried the wall clock of its build. So the archive, not its contents, was
-    # the whole difference. --mtime pins that clock to the one instant this
-    # repository stamps everywhere; --owner/--group/--numeric-owner keep the ids
-    # from describing the builder; --sort=name makes the order a function of the
-    # names rather than of readdir, which agreed across the two runs measured and
-    # is promised by nothing.
-    tar --sort=name --mtime=@1577836800 --owner=0 --group=0 --numeric-owner \
-        -C /kmods -cf /modules.tar lib && \
-    printf '%s\n' "$(cat include/config/kernel.release)" > /kernel.release && \
-    ls /kmods/lib/modules/
-
-# Build the board DTB directly from the maintained source. The Makefile entry
-# that makes this target exist is kernel/patches/0004, applied with the rest of
-# the series above -- it was an `echo ... >>` here until RFCT-343, which is an
-# edit to the kernel source performed by a shell redirection in the middle of a
-# build, invisible to the series-length assertion and to review. The .dts itself
-# is copied in beside the patches, above, so that the tree is coherent from the
-# moment 0004 names the file rather than only by the time this stage runs.
-RUN cd /ksrc && \
-    grep -qF 'dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3576-cx3576z.dtb' \
-        arch/arm64/boot/dts/rockchip/Makefile && \
-    make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- rockchip/rk3576-cx3576z.dtb && \
-    cp arch/arm64/boot/dts/rockchip/rk3576-cx3576z.dtb /rk3576-src.dtb && \
-    test "$(fdtget /rk3576-src.dtb /leds/status-red label)" = "status-red" && \
-    test "$(fdtget /rk3576-src.dtb /leds/status-red default-state)" = "on" && \
-    test "$(fdtget -t x /rk3576-src.dtb /leds/status-red gpios | awk '{print $3}')" = "1" && \
-    test "$(fdtget /rk3576-src.dtb /leds/status-blue label)" = "status-blue" && \
-    test "$(fdtget /rk3576-src.dtb /leds/status-blue default-state)" = "off" && \
-    test "$(fdtget -t x /rk3576-src.dtb /leds/status-blue gpios | awk '{print $3}')" = "0"
+ARG KERNEL_EXPECT=6.1.115
+COPY kernel/build.sh /bsp/kernel/build.sh
+RUN bash /bsp/kernel/build.sh /ksrc "${KERNEL_EXPECT}"
 
 # THE RESOLVED CONFIG IS AN ARTIFACT, the shape x64 and virt-arm64 already
 # export. It is what `olddefconfig` decided over kernel/config/kernel-cx3576z.config

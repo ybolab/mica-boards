@@ -1,10 +1,16 @@
 # bsp — CX3576-Z (Rockchip RK3576)
 
-The board's bootloader and kernel are built here. Each component is an
-independent buildkit Dockerfile producing finished artifacts under
-`_out/boards/cx3576/` (RFCT-343 moved them there from `out/` beside this file,
-so every build product in the repository is under one directory);
-nothing here builds or modifies the mos rootfs, which `rootfs/` owns.
+The board's bootloader and kernel are built here. Each component is a buildkit
+Dockerfile producing finished artifacts under `_out/boards/cx3576/` (RFCT-343
+moved them there from `out/` beside this file, so every build product in the
+repository is under one directory); nothing here builds or modifies the mos
+rootfs, which `rootfs/` owns.
+
+The Dockerfiles are ORCHESTRATION. Since RFCT-345 the build steps themselves are
+scripts beside them -- `scripts/` for what the two builders share,
+`<component>/build.sh` for the rest -- and every edit to a vendor tree is a patch
+listed in that component's `patches/series`. The gate on that move was byte
+identity: all eleven artefacts came back unchanged.
 
 `Makefile` in this directory drives every target. The repo root delegates to it:
 `make cx3576-<target>` runs `make -C boards/cx3576/bsp <target>`.
@@ -20,6 +26,10 @@ nothing here builds or modifies the mos rootfs, which `rootfs/` owns.
 - `rootfs/` — Alpine demo rootfs (overlay under `alpine/rootfs/`, installed onto `/`)
   + WiFi firmware blobs (AP6275S / AIC8800 dual SKU); the demo image itself
   ships only the verified AIC8800D80 U02 blobs
+- `scripts/` — the steps the kernel and U-Boot builders share: dependency
+  install, pinned source fetch, series-driven patch application. The U-Boot
+  target reaches them through the `bsp-scripts` build context, which is why its
+  own build context can stay `uboot/`
 - `init/` — board hardware facts consumed by the `boards/cx3576/hwinit`
   systemd units
 - `Dockerfile.alpine` — assembles the flashable Alpine debug/demo disk image (extlinux boot)
