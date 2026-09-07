@@ -2,7 +2,7 @@
 # check=skip=InvalidDefaultArgInFrom
 # The x64 kernel: mainline stable, configured by this repository, built here.
 #
-#   make x64-kernel          -> boards/x64/bsp/out/kernel/{bzImage,modules.tar,config,kernel.release}
+#   make x64-kernel          -> _out/boards/x64/kernel/{bzImage,modules.tar,config,kernel.release}
 #   make x64-kernel-config   -> rewrites config/x64.config from this build
 #
 # WHY THIS EXISTS. x64 used to depend on Debian's linux-image-amd64. That
@@ -207,7 +207,17 @@ RUN set -eu; cd /ksrc; \
     [ -f "/kmods/lib/modules/${release}/modules.dep" ] || \
         { echo "error: modules_install wrote no modules.dep for ${release}" >&2; exit 1; }; \
     rm -f "/kmods/lib/modules/${release}/build" "/kmods/lib/modules/${release}/source"; \
-    tar -C /kmods -cf /modules.tar lib; \
+    # DETERMINISTIC ARCHIVE PARAMETERS. A tar is a packaging step, and its
+    # headers were carrying the wall clock: RFCT-343 measured a cx3576 pair
+    # whose every member was byte-identical and whose every header held the
+    # build's mtime, and this line was character-for-character the same one, so
+    # the defect is shared rather than that board's. --mtime pins the clock to
+    # the one instant this repository stamps everywhere;
+    # --owner/--group/--numeric-owner keep the ids from describing the builder;
+    # --sort=name makes member order a function of the names rather than of
+    # readdir, which is promised by nothing.
+    tar --sort=name --mtime=@1577836800 --owner=0 --group=0 --numeric-owner \
+        -C /kmods -cf /modules.tar lib; \
     printf '%s\n' "${release}" > /kernel.release; \
     echo "kernel: bzImage $(stat -c%s arch/x86/boot/bzImage) bytes, $(find /kmods -name '*.ko*' | wc -l) module(s), modules.tar $(stat -c%s /modules.tar) bytes"
 

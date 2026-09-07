@@ -7,6 +7,22 @@
 # PLAN-074, and the layout file says so now.
 .PHONY: all kernel kernel-config clean
 
+# WHERE THE ARTEFACTS GO. `_out/boards/<board>/`, not `out/` beside this file.
+# `_out/` is the one directory every other build product in this repository
+# lives in and the one a clean removes, and a BSP output sitting outside it is
+# how `out/kernel/Image` stayed at its 2026-08-31 build for a week while
+# boards/common/mos-required.fragment gained four symbols underneath it
+# (RFCT-343). Overridable, because a build that wants to keep a tree aside
+# should not have to edit this file.
+#
+# boards/<board>/deb/*/render.sh and stage.sh read the same default and accept
+# the same override. It is a SEPARATE variable from BOARD_DIR on purpose:
+# BOARD_DIR is the bsp SOURCE directory -- committed firmware, containers.env,
+# this Makefile -- and conflating the two is what made "point BOARD_DIR at
+# prebuilt artefacts" also repoint the firmware.
+BSP_OUT ?= ../../../_out/boards/x64
+
+
 # EVERY BASE IMAGE COMES FROM build-env/images.env. The Dockerfile declares its
 # FROM argument with NO default, so a recipe that forgot to pass one fails at
 # `docker buildx build` with "base name should not be blank" rather than
@@ -31,8 +47,8 @@ kernel:
 	docker buildx build --build-context mos-common=../../common \
 	  -f kernel/Dockerfile --target artifact $$IMG \
 	  $(if $(KERNEL_BUILDER),--builder $(KERNEL_BUILDER)) \
-	  -o out/kernel .
-	@ls -la out/kernel/
+	  -o $(BSP_OUT)/kernel .
+	@ls -la $(BSP_OUT)/kernel/
 
 # Re-record config/x64.config from the fragments and the pinned source.
 #
@@ -49,4 +65,4 @@ kernel-config:
 	@echo "recorded: kernel/config/x64.config ($$(grep -c . kernel/config/x64.config) lines)"
 
 clean:
-	rm -rf out
+	rm -rf $(BSP_OUT)
