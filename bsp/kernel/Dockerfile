@@ -31,6 +31,7 @@ RUN git init -q /ksrc && \
     test "$(git -C /ksrc rev-parse HEAD)" = "${KERNEL_COMMIT}"
 
 COPY kernel/patches/ /patches/
+COPY kernel/dts/rk3576-cx3576z.dts /ksrc/arch/arm64/boot/dts/rockchip/
 # A for loop's status is that of its last iteration and the old `ls
 # 2>/dev/null` glob made an empty or missing /patches a green zero-patch run —
 # so a reject in any patch but the last (or a lost COPY) still produced an
@@ -40,7 +41,7 @@ COPY kernel/patches/ /patches/
 # effect is additionally asserted in the compiled tree after `make` below.
 RUN set -e; \
     count=$(ls /patches/*.patch | wc -l); \
-    [ "$count" -eq 2 ] || { echo "ERROR: expected 2 kernel patches, found $count" >&2; exit 1; }; \
+    [ "$count" -eq 4 ] || { echo "ERROR: expected 4 kernel patches, found $count" >&2; exit 1; }; \
     cd /ksrc && for p in $(ls /patches/*.patch | sort); do \
         echo ">> applying $(basename "$p")" && patch -p1 --no-backup-if-mismatch < "$p"; \
     done
@@ -148,9 +149,40 @@ RUN cd /ksrc && \
 # SOURCE_DATE_EPOCH. One instant across every artefact this repository
 # produces, so a timestamp anywhere in an image is either that value or a
 # defect.
+# SOURCE_DATE_EPOCH is the FOURTH pin, and it is not redundant with the three
+# above. RFCT-320 set those; RFCT-343 then ran the experiment they were never
+# checked against -- two `--no-cache` builds of this target, same tree, back to
+# back -- and the Image still differed. Twenty-four bytes at equal size, in two
+# clusters. Five of them are `__DATE__` and `__TIME__` compiled into the vendor
+# Mali driver, which prints "Compiled: %s, time: %s"
+# (drivers/gpu/arm/mali400/mali/linux/mali_kernel_linux.c:404 and :410-411).
+# No KBUILD_BUILD_* reaches those: they are cpp builtins that read the wall
+# clock while preprocessing, and mainline's `-Werror=date-time` -- which is why
+# no in-tree source can do this -- does not cover a vendor tree carrying its own
+# build system. The other nineteen are the GNU build-id, which is a hash OF the
+# linked image and moved only because the five did.
+#
+# gcc honours SOURCE_DATE_EPOCH for both macros, which is what pins them. Kbuild
+# reads none of it -- it takes KBUILD_BUILD_TIMESTAMP -- so this variable's whole
+# effect here is on `__DATE__`/`__TIME__` in the vendor drivers.
+#
+# IT IS NOT THE WHOLE FIX, and the second experiment is what said so. With
+# SOURCE_DATE_EPOCH set, one of the two Mali sites came out pinned at
+# `Jan  1 2020 / 00:00:00` in both builds and the Image STILL differed -- by 24
+# bytes again, in a different place. The remaining four are
+# `BUILD_DATE=$(shell date)` in drivers/gpu/arm/mali400/mali/Kbuild, a MAKE-time
+# shell call that no compiler variable can reach, and the other twenty were the
+# build-id following it. kernel/patches/0003 pins that one; the two together are
+# what make this kernel byte-reproducible.
+#
+# `-j"$(nproc)"` below was the other suspect and is NOT implicated: every
+# differing byte in both experiments was a date string or a hash of one, and
+# nothing about parallelism produces those. CONFIG_DEBUG_INFO was the third and
+# is not implicated either, for the same reason.
 ENV KBUILD_BUILD_TIMESTAMP="@1577836800" \
     KBUILD_BUILD_USER=mos \
-    KBUILD_BUILD_HOST=mos-build
+    KBUILD_BUILD_HOST=mos-build \
+    SOURCE_DATE_EPOCH=1577836800
 
 RUN cd /ksrc && \
     make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)" Image modules && \
@@ -161,19 +193,39 @@ RUN cd /ksrc && \
     # 0002's AIC_WLAN_SUPPORT gate on the aic8800_sdio directory.
     grep -qF 'module_param(yt8531_stock_init, bool, 0444);' drivers/net/phy/motorcomm.c && \
     grep -qF 'obj-$(CONFIG_AIC_WLAN_SUPPORT) += aic8800_sdio/' drivers/net/wireless/Makefile && \
+    grep -qF 'BUILD_DATE=$(shell date -u -d' drivers/gpu/arm/mali400/mali/Kbuild && \
+    grep -qF 'dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3576-cx3576z.dtb' \
+        arch/arm64/boot/dts/rockchip/Makefile && \
     grep -q '^CONFIG_LEDS_TRIGGER_HEARTBEAT=y' include/config/auto.conf && \
     echo "kernel release: $(cat include/config/kernel.release)" && \
     [ "$(cat include/config/kernel.release)" = "${KERNEL_EXPECT}" ] && \
     make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
          INSTALL_MOD_PATH=/kmods INSTALL_MOD_STRIP=1 modules_install && \
-    tar -C /kmods -cf /modules.tar lib && \
+    # DETERMINISTIC ARCHIVE PARAMETERS, and this is a packaging fix rather than
+    # a compile one -- separable from the Image above and measured separately.
+    # RFCT-343 compared two modules.tar from two --no-cache builds: every member
+    # was byte-identical, the member ORDER was identical, and every header
+    # carried the wall clock of its build. So the archive, not its contents, was
+    # the whole difference. --mtime pins that clock to the one instant this
+    # repository stamps everywhere; --owner/--group/--numeric-owner keep the ids
+    # from describing the builder; --sort=name makes the order a function of the
+    # names rather than of readdir, which agreed across the two runs measured and
+    # is promised by nothing.
+    tar --sort=name --mtime=@1577836800 --owner=0 --group=0 --numeric-owner \
+        -C /kmods -cf /modules.tar lib && \
+    printf '%s\n' "$(cat include/config/kernel.release)" > /kernel.release && \
     ls /kmods/lib/modules/
 
-# Build the board DTB directly from the maintained source.
-COPY kernel/dts/rk3576-cx3576z.dts /ksrc/arch/arm64/boot/dts/rockchip/
+# Build the board DTB directly from the maintained source. The Makefile entry
+# that makes this target exist is kernel/patches/0004, applied with the rest of
+# the series above -- it was an `echo ... >>` here until RFCT-343, which is an
+# edit to the kernel source performed by a shell redirection in the middle of a
+# build, invisible to the series-length assertion and to review. The .dts itself
+# is copied in beside the patches, above, so that the tree is coherent from the
+# moment 0004 names the file rather than only by the time this stage runs.
 RUN cd /ksrc && \
-    echo 'dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3576-cx3576z.dtb' \
-        >> arch/arm64/boot/dts/rockchip/Makefile && \
+    grep -qF 'dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3576-cx3576z.dtb' \
+        arch/arm64/boot/dts/rockchip/Makefile && \
     make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- rockchip/rk3576-cx3576z.dtb && \
     cp arch/arm64/boot/dts/rockchip/rk3576-cx3576z.dtb /rk3576-src.dtb && \
     test "$(fdtget /rk3576-src.dtb /leds/status-red label)" = "status-red" && \
@@ -183,7 +235,19 @@ RUN cd /ksrc && \
     test "$(fdtget /rk3576-src.dtb /leds/status-blue default-state)" = "off" && \
     test "$(fdtget -t x /rk3576-src.dtb /leds/status-blue gpios | awk '{print $3}')" = "0"
 
+# THE RESOLVED CONFIG IS AN ARTIFACT, the shape x64 and virt-arm64 already
+# export. It is what `olddefconfig` decided over kernel/config/kernel-cx3576z.config
+# merged with boards/common/mos-required.fragment -- an OUTPUT of this build, and
+# the only form of the floor that the image contract can read back out of a
+# packed root. Before RFCT-343 this board exported none, so its `=y` floor was
+# enforced at kernel-build time and nowhere else, and an image assembled from a
+# STALE _out/boards/cx3576/kernel shipped a kernel predating symbols the fragment had since
+# gained with no check going red. kernel.release names the file downstream, so
+# that the config and the modules beside it cannot be from different kernels
+# without the packaging step noticing.
 FROM scratch AS artifact
 COPY --from=build /ksrc/arch/arm64/boot/Image /
+COPY --from=build /ksrc/.config /config
+COPY --from=build /kernel.release /
 COPY --from=build /modules.tar /
 COPY --from=build /rk3576-src.dtb /

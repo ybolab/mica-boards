@@ -3,6 +3,22 @@
 .PHONY: all uboot uboot-mos kernel rootfs image rkdeveloptool-macos flash flash-maskrom flash-rootfs-offline \
 	source-check clean
 
+# WHERE THE ARTEFACTS GO. `_out/boards/<board>/`, not `out/` beside this file.
+# `_out/` is the one directory every other build product in this repository
+# lives in and the one a clean removes, and a BSP output sitting outside it is
+# how `out/kernel/Image` stayed at its 2026-08-31 build for a week while
+# boards/common/mos-required.fragment gained four symbols underneath it
+# (RFCT-343). Overridable, because a build that wants to keep a tree aside
+# should not have to edit this file.
+#
+# boards/<board>/deb/*/render.sh and stage.sh read the same default and accept
+# the same override. It is a SEPARATE variable from BOARD_DIR on purpose:
+# BOARD_DIR is the bsp SOURCE directory -- committed firmware, containers.env,
+# this Makefile -- and conflating the two is what made "point BOARD_DIR at
+# prebuilt artefacts" also repoint the firmware.
+BSP_OUT ?= ../../../_out/boards/cx3576
+
+
 TOOLS_DIR ?= tools
 THIRD_DIR ?= third
 RKDEVELOPTOOL_LOCAL := $(TOOLS_DIR)/rkdeveloptool
@@ -37,7 +53,7 @@ uboot:
 	docker buildx build -f uboot/Dockerfile $$IMG \
 	  $(if $(UBOOT_COMMIT),--build-arg UBOOT_COMMIT=$(UBOOT_COMMIT)) \
 	  $(if $(RKBIN_COMMIT),--build-arg RKBIN_COMMIT=$(RKBIN_COMMIT)) \
-	  -o out/uboot uboot
+	  -o $(BSP_OUT)/uboot uboot
 
 # mos A/B variant (persistent redundant env + boot.scr contract); consumed by
 # the mos image pipeline, while the debug variant above stays on alpine.
@@ -46,29 +62,29 @@ uboot-mos:
 	docker buildx build -f uboot/Dockerfile --target artifact-mos $$IMG \
 	  $(if $(UBOOT_COMMIT),--build-arg UBOOT_COMMIT=$(UBOOT_COMMIT)) \
 	  $(if $(RKBIN_COMMIT),--build-arg RKBIN_COMMIT=$(RKBIN_COMMIT)) \
-	  -o out/uboot-mos uboot
+	  -o $(BSP_OUT)/uboot-mos uboot
 
 kernel:
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
 	docker buildx build --build-context mos-common=../../common -f kernel/Dockerfile $$IMG \
 	  $(if $(KERNEL_COMMIT),--build-arg KERNEL_COMMIT=$(KERNEL_COMMIT)) \
 	  $(if $(KERNEL_EXPECT),--build-arg KERNEL_EXPECT=$(KERNEL_EXPECT)) \
-	  -o out/kernel .
+	  -o $(BSP_OUT)/kernel .
 
 rootfs: kernel
 	IMG="$$(bash $(FROM_SH) $(ALPINE_ARG) $(UBUNTU_ARG))" && \
 	docker buildx build -f rootfs/alpine/Dockerfile $$IMG \
 	  --platform linux/arm64 \
-	  --build-context kernel-out=out/kernel \
+	  --build-context kernel-out=$(BSP_OUT)/kernel \
 	  --build-context firmware=rootfs/firmware \
-	  -o out/rootfs rootfs/alpine
+	  -o $(BSP_OUT)/rootfs rootfs/alpine
 
 image: uboot rootfs
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
-	docker buildx build -f Dockerfile.alpine --target artifact $$IMG -o out .
-	@cd out && $(SHA256) disk.img > disk.img.sha256
-	@ls -la out/disk.img
-	@cat out/disk.img.sha256
+	docker buildx build -f Dockerfile.alpine --target artifact $$IMG -o $(BSP_OUT) .
+	@cd $(BSP_OUT) && $(SHA256) disk.img > disk.img.sha256
+	@ls -la $(BSP_OUT)/disk.img
+	@cat $(BSP_OUT)/disk.img.sha256
 
 # Build the native macOS flashing tool.
 rkdeveloptool-macos:
@@ -88,16 +104,16 @@ source-check:
 # compare it against the source image; a partial or corrupt write here is the
 # one failure that bricks the board past the recovery key.
 define verify-boot-area
-	$(RKDEVELOPTOOL) rl 0 32768 out/.verify-boot.img
-	head -c 16777216 out/disk.img | cmp - out/.verify-boot.img
-	rm -f out/.verify-boot.img
-	@echo "Boot area (loader + u-boot.itb) verified against out/disk.img."
+	$(RKDEVELOPTOOL) rl 0 32768 $(BSP_OUT)/.verify-boot.img
+	head -c 16777216 $(BSP_OUT)/disk.img | cmp - $(BSP_OUT)/.verify-boot.img
+	rm -f $(BSP_OUT)/.verify-boot.img
+	@echo "Boot area (loader + u-boot.itb) verified against $(BSP_OUT)/disk.img."
 endef
 
 # Flash the complete image while the board is in Loader mode.
 flash:
 	@echo "WARNING: Keep board power and USB connected until rkdeveloptool rd completes."
-	$(RKDEVELOPTOOL) wl 0 out/disk.img
+	$(RKDEVELOPTOOL) wl 0 $(BSP_OUT)/disk.img
 	$(verify-boot-area)
 	$(RKDEVELOPTOOL) rd
 
@@ -106,15 +122,15 @@ flash-maskrom:
 	@echo "WARNING: Keep board power and USB connected until rkdeveloptool rd completes."
 	$(SHA256) -c uboot/MiniLoaderAll.bin.sha256
 	$(RKDEVELOPTOOL) db $(VENDOR_MINILOADER)
-	$(RKDEVELOPTOOL) wl 0 out/disk.img
+	$(RKDEVELOPTOOL) wl 0 $(BSP_OUT)/disk.img
 	$(verify-boot-area)
 	$(RKDEVELOPTOOL) rd
 
 # Flash only rootfs when the kernel and partition layout are unchanged.
 flash-rootfs-offline:
 	@echo "WARNING: Keep board power and USB connected until rkdeveloptool rd completes."
-	$(RKDEVELOPTOOL) wl 163840 out/rootfs/rootfs.img
+	$(RKDEVELOPTOOL) wl 163840 $(BSP_OUT)/rootfs/rootfs.img
 	$(RKDEVELOPTOOL) rd
 
 clean:
-	rm -rf out
+	rm -rf $(BSP_OUT)

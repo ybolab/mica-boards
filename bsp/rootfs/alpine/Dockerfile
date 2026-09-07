@@ -44,7 +44,7 @@ RUN echo 'root:root' | chpasswd && \
     chmod 0440 /etc/sudoers.d/wheel && \
     visudo -cf /etc/sudoers
 
-# Kernel modules must come from the same build as out/kernel/Image. Named
+# Kernel modules must come from the same build as _out/boards/cx3576/kernel/Image. Named
 # contexts support COPY, so extract the tarball in one explicit build step.
 COPY --from=kernel-out modules.tar /tmp/modules.tar
 RUN tar -xf /tmp/modules.tar -C / && rm /tmp/modules.tar

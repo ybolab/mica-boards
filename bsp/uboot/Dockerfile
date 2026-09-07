@@ -22,6 +22,27 @@
 ARG MOS_IMAGE_UBUNTU_2404
 FROM --platform=$BUILDPLATFORM ${MOS_IMAGE_UBUNTU_2404} AS build
 
+# THE BUILD CLOCK, pinned. Measured under RFCT-343: this Dockerfile pinned none
+# of SOURCE_DATE_EPOCH or KBUILD_BUILD_*, and both variants shipped their own
+# wall clock in the version banner --
+#   U-Boot 2026.07-gece349ade297-dirty (Aug 25 2026 - 18:35:45 +0000)   out/uboot
+#   U-Boot 2026.07-gece349ade297-dirty (Aug 30 2026 - 16:29:48 +0000)   out/uboot-mos
+# read straight out of the shipped binaries. Two builds of one unchanged tree
+# therefore differed, `uname -v`-style, and no comparison of a boot blob against
+# its source could be a byte comparison.
+#
+# U-Boot reads SOURCE_DATE_EPOCH for exactly this (docs.u-boot.org, "Reproducible
+# builds"): it replaces the timestamp in the banner and in the FIT it builds.
+# 1577836800 is 2020-01-01T00:00:00Z, the same constant boards/cx3576/board.env
+# pins as FILE_MTIME and E2FSPROGS_FAKE_TIME, rootfs/build.sh passes as
+# SOURCE_DATE_EPOCH and kernel/Dockerfile now pins too. One instant across every
+# artefact this repository produces.
+#
+# `-dirty` stays and is not a defect: the patch series is applied to the fetched
+# tree without committing, so `git describe` says dirty on every build. It is
+# the same word every time, which is all reproducibility asks of it.
+ENV SOURCE_DATE_EPOCH=1577836800
+
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git ca-certificates build-essential bc bison flex \

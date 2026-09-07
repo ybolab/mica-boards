@@ -185,6 +185,45 @@ RUN set -eu; \
     rm -rf /tmp/mods; \
     [ -n "$(ls -A "${ROOT}/usr/lib/modules")" ] || { echo "error: /in/stage/modules.tar unpacked to no lib/modules content; the package would ship a kernel with no modules" >&2; exit 1; }; \
     \
+    # THE RESOLVED KERNEL CONFIG, shipped at the path the image contract reads. \
+    # Until RFCT-343 this board exported none, so boards/common/mos-required.fragment \
+    # was enforced at kernel-BUILD time and nowhere else -- and the BSP output is \
+    # an input to this package, not something it rebuilds. A stale one therefore \
+    # shipped a kernel predating whatever the fragment had gained since, with no \
+    # check red anywhere: measured, an Image from 2026-08-31 rode every image built \
+    # until 2026-09-07 while the fragment gained dm-crypt, the eBPF/firewall/bridge \
+    # floor and NF_CONNTRACK_MARK/NF_NAT_MASQUERADE. verify/src/checks-kernel.ts \
+    # reads /boot/config-<release> off the packed root, which is what makes the \
+    # floor an assertion about the artefact instead of about the build that is \
+    # not being run. \
+    # \
+    # NOT a conffile, for the reason boards/x64/deb/kernel-x64/Dockerfile gives: \
+    # it is a record of how the kernel beside it was built, and this root is an \
+    # immutable dm-verity squashfs where dpkg could never perform the three-way \
+    # merge a conffiles entry promises. \
+    release="$(cat /in/stage/kernel.release)"; \
+    [ -n "${release}" ] || { echo "error: the staged kernel.release is empty, so the shipped config would be named after nothing and verify would find no /boot/config-* to read" >&2; exit 1; }; \
+    # THE BINDING, and it is the point of staging kernel.release at all. The \
+    # config and the module tree are two files copied out of the same BSP output, \
+    # and nothing until here proved they came from the same build of it. A tree \
+    # whose modules are ${release} beside a config from another kernel is a root \
+    # where every symbol the contract reads describes something the device does \
+    # not run -- green, and about the wrong kernel. \
+    [ -d "${ROOT}/usr/lib/modules/${release}" ] || \
+        { echo "error: modules.tar unpacked to no lib/modules/${release}, though the staged kernel.release names it. The config and the modules in /in/stage came from different builds of the BSP kernel, and the package would ship a kernel config describing a kernel whose modules are not beside it" >&2; exit 1; }; \
+    install -D -m 0644 /in/stage/config "${ROOT}/boot/config-${release}"; \
+    # The floor this board BOOTS through, re-asserted over the bytes being \
+    # packed rather than over the build that produced them -- the same shape and \
+    # the same reason as x64's. cx3576 assembles /dev/dm-0 from dm-mod.create= \
+    # with no initramfs, so a symbol that is not built in is not a degraded \
+    # feature, it is a boot that ends at rootwait days after this build was \
+    # green. \
+    for option in DM_INIT BLK_DEV_DM DM_VERITY SQUASHFS SQUASHFS_ZSTD OVERLAY_FS; do \
+        grep -q "^CONFIG_${option}=y$" "${ROOT}/boot/config-${release}" || \
+            { echo "error: the shipped /boot/config-${release} does not declare CONFIG_${option}=y. This board boots root=/dev/dm-0 from a dm-mod.create= table with no initramfs; without this symbol built in there is nothing to load it from and the boot ends at rootwait" >&2; exit 1; }; \
+    done; \
+    echo "kernel: staged /boot/config-${release} ($(grep -c . "${ROOT}/boot/config-${release}") lines) beside $(find "${ROOT}/usr/lib/modules/${release}" -name '*.ko*' | wc -l) module(s)"; \
+    \
     # THE BOOT INPUTS, AND WHY THEY ARE IN A ROOTFS PACKAGE. Nothing here is \
     # ever executed on the device: the kernel Image, the device tree and the \
     # U-Boot binary are consumed by the image FINALIZER, which writes them into \
