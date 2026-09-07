@@ -86,7 +86,9 @@ rootfs: kernel
 
 image: uboot rootfs
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
-	docker buildx build -f Dockerfile.alpine --target artifact $$IMG -o $(BSP_OUT) .
+	docker buildx build -f Dockerfile.alpine --target artifact $$IMG \
+	  --build-context bsp-out=$(BSP_OUT) \
+	  -o $(BSP_OUT) .
 	@cd $(BSP_OUT) && $(SHA256) disk.img > disk.img.sha256
 	@ls -la $(BSP_OUT)/disk.img
 	@cat $(BSP_OUT)/disk.img.sha256

@@ -27,10 +27,15 @@ RUN apt-get update \
         ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
-COPY out/uboot/u-boot-rockchip.bin /input/u-boot-rockchip.bin
-COPY out/kernel/Image /input/Image
-COPY out/kernel/rk3576-src.dtb /input/rk3576-src.dtb
-COPY out/rootfs/rootfs.img /input/rootfs.img
+# From a NAMED BUILD CONTEXT, not from `.`. RFCT-343 moved every BSP output to
+# _out/boards/<board>/, which is outside this target's context, so the four
+# `COPY out/...` lines that were here could not resolve and this target had not
+# built since. The Makefile passes --build-context bsp-out=$(BSP_OUT), the same
+# way the rootfs target already passes kernel-out.
+COPY --from=bsp-out uboot/u-boot-rockchip.bin /input/u-boot-rockchip.bin
+COPY --from=bsp-out kernel/Image /input/Image
+COPY --from=bsp-out kernel/rk3576-src.dtb /input/rk3576-src.dtb
+COPY --from=bsp-out rootfs/rootfs.img /input/rootfs.img
 
 ARG CMDLINE="earlycon=uart8250,mmio32,0x2ad40000 console=ttyFIQ0,1500000 console=tty1 root=PARTLABEL=rootfs rw rootwait net.ifnames=0"
 ARG BOOT_SIZE_MIB=64
