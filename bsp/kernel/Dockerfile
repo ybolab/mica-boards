@@ -2,7 +2,7 @@
 # check=skip=InvalidDefaultArgInFrom
 # The virt-arm64 kernel: mainline stable, configured by this repository, built here.
 #
-#   make virt-arm64-kernel         -> boards/virt-arm64/bsp/out/kernel/{Image,modules.tar,config,kernel.release}
+#   make virt-arm64-kernel         -> _out/boards/virt-arm64/kernel/{Image,modules.tar,config,kernel.release}
 #   make virt-arm64-kernel-config  -> rewrites config/virt-arm64.config from this build
 #
 # WHY THIS EXISTS. The boot contract is `dm-mod.create=` on the kernel command
@@ -194,11 +194,12 @@ FROM gate AS build
 # artefact this repository produces, so a timestamp anywhere in an image is
 # either that value or a defect.
 #
-# NOTE, and it is a real difference from cx3576: that board's kernel is NOT
-# reproducible -- its Dockerfile pins no KBUILD_BUILD_* at all, so its Image is
-# compared by size rather than by sha256. This board follows x64 instead, which
-# does pin them, so this kernel is expected to be byte-reproducible and may be
-# compared as such.
+# NO LONGER A DIFFERENCE FROM cx3576, and the note is kept because it recorded
+# one. That board pinned nothing when this was written, so its Image was
+# compared by size; RFCT-320 added the same three pins and RFCT-343 then
+# measured what they left -- `__DATE__`/`__TIME__` in a vendor driver, which no
+# KBUILD_BUILD_* reaches -- and pinned SOURCE_DATE_EPOCH for it. All three
+# boards are byte-reproducible now and may be compared by sha256.
 ENV KBUILD_BUILD_TIMESTAMP="@1577836800" \
     KBUILD_BUILD_USER=mos \
     KBUILD_BUILD_HOST=mos-build
@@ -219,7 +220,17 @@ RUN set -eu; cd /ksrc; \
     [ -f "/kmods/lib/modules/${release}/modules.dep" ] || \
         { echo "error: modules_install wrote no modules.dep for ${release}" >&2; exit 1; }; \
     rm -f "/kmods/lib/modules/${release}/build" "/kmods/lib/modules/${release}/source"; \
-    tar -C /kmods -cf /modules.tar lib; \
+    # DETERMINISTIC ARCHIVE PARAMETERS. A tar is a packaging step, and its
+    # headers were carrying the wall clock: RFCT-343 measured a cx3576 pair
+    # whose every member was byte-identical and whose every header held the
+    # build's mtime, and this line was character-for-character the same one, so
+    # the defect is shared rather than that board's. --mtime pins the clock to
+    # the one instant this repository stamps everywhere;
+    # --owner/--group/--numeric-owner keep the ids from describing the builder;
+    # --sort=name makes member order a function of the names rather than of
+    # readdir, which is promised by nothing.
+    tar --sort=name --mtime=@1577836800 --owner=0 --group=0 --numeric-owner \
+        -C /kmods -cf /modules.tar lib; \
     printf '%s\n' "${release}" > /kernel.release; \
     echo "kernel: Image $(stat -c%s arch/arm64/boot/Image) bytes, $(find /kmods -name '*.ko*' | wc -l) module(s), modules.tar $(stat -c%s /modules.tar) bytes"
 

@@ -13,14 +13,16 @@
 #
 # One thing forces a host-side step: a missing kernel has to be refused BEFORE
 # buildkit has resolved a base image, transferred the contexts and started a
-# stage. boards/virt-arm64/bsp/out is gitignored, so a fresh worktree has none.
+# stage. _out/boards/virt-arm64/ is a build product, so a fresh worktree has none.
 #
-# NO BOARD_DIR HERE, unlike the cx3576 board producer. That variable is one
-# global honoured by whichever producers read it, so a second reader makes
+# NO BOARD_DIR AND NO BSP_OUT HERE, unlike the cx3576 board producer. Either is
+# one global honoured by whichever producers read it, so a second reader makes
 # `BOARD_DIR=<a cx3576 bsp tree>` mean two incompatible things in one run --
 # and tests/deb-preflight-test.sh sets exactly that while driving the whole
-# aggregate. This board's escape is simpler and needs no variable: out/kernel/ is
-# gitignored, so copying a built kernel into it is the same act.
+# aggregate. RFCT-343 moved the outputs under `_out/` and deliberately did not
+# take the opportunity to give this hook an override it does not need. This board's escape is simpler and needs no variable:
+# _out/boards/virt-arm64/kernel/ is a build product, so copying a built kernel
+# into it is the same act.
 set -euo pipefail
 
 die() {
@@ -35,6 +37,9 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # grandparent.
 BOARD_ROOT="$(cd "${HERE}/../.." && pwd)"
 MOS_BOARD="$(basename "${BOARD_ROOT}")"
+# boards/<board> -> the repository root. Derived, not read from the environment:
+# see the note above on why this hook honours no shared path variable.
+REPO_ROOT="$(cd "${BOARD_ROOT}/../.." && pwd)"
 VERSIONS_ENV="${BOARD_ROOT}/bsp/kernel/versions.env"
 
 STAGE="${MOS_DEB_STAGE:-}"
@@ -47,7 +52,7 @@ fi
 [ -f "${VERSIONS_ENV}" ] ||
     die "${VERSIONS_ENV} does not exist. It is the pin -- which kernel source this board compiles -- and the release string staged below is asserted against it"
 
-OUT="${BOARD_ROOT}/bsp/out/kernel"
+OUT="${REPO_ROOT}/_out/boards/${MOS_BOARD}/kernel"
 
 # Every missing input reported TOGETHER, and the count of what was examined
 # reported beside it. A run that found nothing missing because it looked at
@@ -60,7 +65,8 @@ require() {
     [ ! -f "${path}" ] || return 0
     MISSING+=("error: ${path} not found.
 Build it with 'make -C boards/${MOS_BOARD}/bsp kernel', or copy a built one in:
-boards/${MOS_BOARD}/bsp/out/kernel/ is gitignored and this reads it directly.")
+_out/boards/${MOS_BOARD}/kernel/ is a build product and this reads it directly, or
+point BSP_OUT at a tree that has one.")
 }
 
 # The four artefacts boards/virt-arm64/bsp/kernel/Dockerfile's `artifact` stage
