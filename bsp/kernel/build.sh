@@ -43,6 +43,11 @@ grep -qF 'dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3576-cx3576z.dtb' \
     arch/arm64/boot/dts/rockchip/Makefile
 grep -q '^CONFIG_LEDS_TRIGGER_HEARTBEAT=y' include/config/auto.conf
 
+# The link-time symbol table and the object it came from, sized in the log
+# because kernel/Dockerfile's artifact stage takes one and leaves the other and
+# the reason is the ratio between these two numbers.
+ls -l vmlinux System.map
+
 release="$(cat include/config/kernel.release)"
 echo "kernel release: ${release}"
 [ "${release}" = "${KERNEL_EXPECT}" ] || {

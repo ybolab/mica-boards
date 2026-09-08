@@ -76,9 +76,30 @@ RUN bash /bsp/kernel/build.sh /ksrc "${KERNEL_EXPECT}"
 # _out/boards/cx3576/kernel shipped a kernel predating symbols the fragment had
 # gained, with no check going red. kernel.release names the config downstream so
 # it and the modules beside it cannot come from different kernels unnoticed.
+#
+# SYSTEM.MAP IS PART OF THAT PROVENANCE, and it is here because its absence cost
+# a campaign. This kernel BUGs in paging_init on the hardware and the console
+# prints addresses -- `pc : ...+0x518`, `x19 : ffffffc009e96d20` -- which nobody
+# could turn into a symbol, because the only two files holding the link-time
+# symbol table, vmlinux and System.map, were left in the build stage and thrown
+# away with it. 6.5 MiB of text beside a 42.4 MiB Image, and it is what makes a
+# register dump readable without the board in front of you. RFCT-351 named all
+# three of that crash's addresses from it within a minute of it existing.
+#
+# NOT vmlinux, which is the other half of the same answer. It is 173.7 MiB with
+# this config's CONFIG_DEBUG_INFO=y -- four times the Image, and 26 times this
+# file -- for line numbers over a symbol name. It stays in the build stage;
+# build.sh sizes both in the log, and a tree that wants it rebuilds with this
+# Dockerfile and reads it out of the cached build stage in seconds.
+#
+# NOT SHIPPED TO THE DEVICE. boards/cx3576/deb/board-cx3576/render.sh stages
+# named files -- the boot slot's own list, modules.tar, config, kernel.release
+# -- so a new file in this export reaches the package only when that list names
+# it, and this one is not in it.
 FROM scratch AS artifact
 COPY --from=build /ksrc/arch/arm64/boot/Image /
 COPY --from=build /ksrc/.config /config
+COPY --from=build /ksrc/System.map /
 COPY --from=build /kernel.release /
 COPY --from=build /modules.tar /
 COPY --from=build /rk3576-src.dtb /
