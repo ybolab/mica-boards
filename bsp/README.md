@@ -40,21 +40,37 @@ overridable with `BSP_OUT`.
 
 ## Flashing
 
-Five ways onto the board, and which one applies is decided by the state the
-board is already in, not by preference.
+Six ways onto the board, and which one applies is decided by the state the
+board is already in and by which image is being written, not by preference.
 
 | Method | Use when | Command | Writes |
 |---|---|---|---|
 | **Loader** | U-Boot boots and its rockusb gadget enumerates | `make flash` | the whole disk |
+| **Loader, mos image** | the same, and what is being written is the product image | `make flash-mos` | the whole disk |
 | **Maskrom** | U-Boot is absent or broken, board enumerates as Maskrom | `make flash-maskrom` | the whole disk, after pushing the pinned vendor loader |
 | **rootfs only** | kernel and partition layout unchanged | `make flash-rootfs-offline` | `_out/boards/cx3576/rootfs/rootfs.img` at sector 163840 |
 | **`ums`** | you are at the U-Boot console | `ums 0 mmc 0`, then `dd` from the host | whatever the host writes |
 | **raw `dd`** | the eMMC or SD is reachable directly | `dd` to the block device | whatever you write |
 
-`make flash` writes `_out/boards/cx3576/disk.img` with `rkdeveloptool wl 0`, verifies the boot
-area by reading it back, and only then issues `rd` to reboot. **Keep power and
-USB connected until `rd` returns** — every flash target says so, because a
-board interrupted mid-write comes back in Maskrom.
+**Which image.** `make flash` and `make flash-maskrom` write
+`_out/boards/cx3576/disk.img`, the Alpine demo image this directory builds.
+`make flash-mos` writes `_out/cx3576/cx3576-mos-latest.img`, the A/B product
+image `make os-image-cx3576` builds at the top level; `MOS_IMAGE=<file>`
+selects another build. That target is here rather than at the top level
+because this Makefile is the only place in the tree that knows how to talk to
+the board.
+
+All three write with `rkdeveloptool wl 0`, then read the **whole** image back
+off the board and compare it byte for byte against the file they wrote
+(`scripts/verify-flash.sh`), and only then issue `rd` to reboot. A difference
+stops the run before the reset, with the board still in loader mode. The boot
+area is read back first and on its own, because a partial or corrupt write
+there is the one failure that bricks the board past the recovery key.
+**Keep power and USB connected until `rd` returns** — every flash target says
+so, because a board interrupted mid-write comes back in Maskrom.
+
+`make flash-rootfs-offline` is the exception: it writes one partition at a
+fixed sector and reads nothing back.
 
 `make flash-maskrom` is the recovery path: it checks `uboot/MiniLoaderAll.bin`
 against its committed sha256, pushes it with `rkdeveloptool db`, and then
