@@ -1,0 +1,40 @@
+ODROIDC5-UBOOT-CONFIG
+# SD-only cfgload script. The vendor U-Boot validates mmc 0:1 before it runs
+# this file; the kernel and DTB remain in the real mos boot slot named below.
+setenv devtype mmc
+setenv devnum 0
+setenv partition @MOS_BOOT_PARTNUM@
+setenv dtb_mem_addr 0x1000000
+setenv loadaddr_kernel 0x3000000
+setenv fdtfile s7d_s905x5m_m100.dtb
+
+# The Amlogic display stack needs U-Boot to establish a mode before Linux takes
+# over. The kernel then reprograms the path because aml_media.vout ends in
+# ",disable"; seamless handoff produces a duplicated half-width console on
+# this board.
+setenv connector0_type "HDMI-A-A"
+setenv outputmode "1080p60hz"
+setenv hdmimode "${outputmode}"
+setenv colorattribute "444,8bit"
+setenv display_layer "osd0"
+setenv fb_addr "0x00300000"
+
+# ttyS0 is the last console in the rendered value, so /dev/console stays on the
+# serial bench even while fbcon is available over HDMI.
+setenv bootargs "console=tty1 @MOS_BOOTARGS@ rauc.slot=@MOS_SLOT@ logo=${display_layer},loaded,${fb_addr} aml_media.vout=${outputmode},disable aml_media.connector0_type=${connector0_type} hdmitx=,${colorattribute} hdmimode=${hdmimode}"
+
+fatload ${devtype} ${devnum}:${partition} ${loadaddr_kernel} Image
+fatload ${devtype} ${devnum}:${partition} ${dtb_mem_addr} ${fdtfile}
+fdt addr ${dtb_mem_addr}
+fdt resize 65536
+
+# Amlogic's add_kernel_bootargs() merges this DTB's one built-in argument by
+# splitting the entire command line on spaces, without respecting the quoted
+# dm-mod.create value. It then removes repeated words, including the second
+# device, block size and block count the verity table requires. With no source
+# property to merge, the later standard bootm FDT fixup installs bootargs from
+# the environment intact.
+if fdt rm /chosen bootargs; then echo "bootargs: removed DT merge input"; fi
+
+if vout output ${outputmode}; then echo "display: ${outputmode} enabled"; fi
+booti ${loadaddr_kernel} - ${dtb_mem_addr}

@@ -1,0 +1,15 @@
+[Unit]
+Description=wpa_supplicant configuration from the STATE partition
+Requires=mos-seed-state.service
+After=mos-seed-state.service
+RequiresMountsFor=/mnt/state
+Before=wpa_supplicant@.service
+
+[Mount]
+What=/mnt/state/wpa_supplicant
+Where=/etc/wpa_supplicant
+Type=none
+Options=bind
+
+[Install]
+WantedBy=local-fs.target

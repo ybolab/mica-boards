@@ -1,0 +1,10 @@
+Package: mos-bm201-front-panel
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: mos build <mos@example.invalid>
+Section: admin
+Priority: optional
+Depends: mos-board-s905x5m (= @VERSION@)
+Description: Optional BM201 front-panel clock and link indicator
+ Renders the synchronized local clock and network carrier state. Missing
+ panel hardware leaves the service inactive without making the boot fail.

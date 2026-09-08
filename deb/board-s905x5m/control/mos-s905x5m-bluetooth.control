@@ -1,0 +1,10 @@
+Package: mos-s905x5m-bluetooth
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: mos build <mos@example.invalid>
+Section: admin
+Priority: optional
+Depends: mos-board-s905x5m (= @VERSION@), mos-s905x5m-radio (= @VERSION@), mos-bluetooth (= @VERSION@), ${shlibs:Depends}
+Description: Seekwave Bluetooth vHCI transport for S905X5M
+ The board-specific bridge, vendor library, controller configuration and unit.
+ BlueZ and its persistent pairing mount remain owned by mos-bluetooth.

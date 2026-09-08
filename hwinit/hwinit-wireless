@@ -1,0 +1,43 @@
+#!/bin/sh
+# Power the Seekwave combo module, load its SDIO/Wi-Fi/vHCI stack in order,
+# and wait for the runtime endpoints named in /etc/mos/wireless.conf.
+set -eu
+
+CONF=${MOS_CONF:-/etc/mos/wireless.conf}
+[ -r "$CONF" ] || exit 0
+conf_get() { sed -n "s/^$1=//p" "$CONF" | head -n1; }
+
+power=$(conf_get power-control)
+platform=$(conf_get platform-module)
+modules=$(conf_get transport-modules)
+interface=$(conf_get interface)
+bt_transport=$(conf_get bt-transport)
+vhci=$(conf_get vhci)
+limit=$(conf_get wait-seconds)
+limit=${limit:-15}
+
+[ -n "$power" ] && [ -n "$platform" ] && [ -n "$modules" ] || {
+    echo "wireless: incomplete power/module facts in $CONF" >&2
+    exit 1
+}
+modprobe -q "$platform"
+[ -w "$power" ] || {
+    echo "wireless: power control is missing or not writable: $power" >&2
+    exit 1
+}
+printf '1\n' > "$power"
+for module in $modules; do modprobe -q "$module"; done
+
+ready() {
+    [ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] &&
+        [ -c "$bt_transport" ] && [ -c "$vhci" ]
+}
+waited=0
+while ! ready && [ "$waited" -lt "$limit" ]; do
+    sleep 1
+    waited=$((waited + 1))
+done
+ready || {
+    echo "wireless: $interface, $bt_transport and $vhci were not all ready within ${limit}s" >&2
+    exit 1
+}
