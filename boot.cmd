@@ -20,10 +20,11 @@
 #    version checked the 370-byte verity env and not the 42 MB kernel, and a
 #    board booted a MIXTURE of two kernel builds and died in paging_init while
 #    the console reported the full 44493312 bytes read (RFCT-351, RFCT-352).
-#    mos-boot-digest.env carries each file's byte count and CRC-32; the script
-#    asserts both and burns the slot when either disagrees. This one needs
-#    CONFIG_CRC32_VERIFY=y in the U-Boot build (section 3.2), so unlike the
-#    other two it is NOT deployable to a device by an update alone.
+#    mos-boot-digest-<slot>.env carries each file's byte count and CRC-32. The
+#    CHECKSUM is the guard: the board measurement below shows the size compare
+#    green on that failure. This one needs CONFIG_CRC32_VERIFY=y in the U-Boot
+#    build (section 3.2), so unlike the other two it is NOT deployable to a
+#    device by an update alone.
 #
 # boot.cmd — mos A/B handshake for CX3576-Z (A/B layout).
 # Compiled to boot.scr and written to BOTH boot partitions by the assembler.
@@ -133,33 +134,32 @@ setenv raucargs "rauc.slot=${bootslot}"
 setenv bootargs "${rootargs} ${verity_args} ${raucargs} ${consoleargs} net.ifnames=0 ${machineid_arg}"
 
 # --- load the kernel and the dtb, and prove what landed ---------------------
-# mos-boot-digest.env records the byte count and the CRC-32 of the Image and the
-# rk3576-src.dtb sitting beside it in THIS boot partition, and it is what turns
-# `load` from a command whose success means "the FAT directory had an entry and
-# the read did not error" into one whose success means "the bytes in DRAM are
-# the bytes on the card". A board booted a mixture of two kernel builds and died
-# in paging_init while the console reported the full 44493312 bytes read
-# (RFCT-351, RFCT-352): an unguarded load cannot tell those two apart, and it
-# was the cheap 370-byte file that was checked and the 42 MB one that was not.
+# mos-boot-digest-<slot>.env records the byte count and the CRC-32 of the Image
+# and the rk3576-src.dtb sitting beside it, and it is what turns `load` from a
+# command whose success means "the FAT directory had an entry and the read did
+# not error" into one whose success means "the bytes in DRAM are the bytes on
+# the card".
 #
-# The file carries NO slot suffix, and the contrast with mos-verity-<slot>.env
-# above is the reason. That file describes a DIFFERENT partition -- the rootfs
-# slot this boot partition will be paired with -- which one RAUC boot payload
-# cannot know, since it is installed into whichever boot slot is inactive, so it
-# ships both slots' copies under distinct names. These digests describe this
-# partition's OWN two files, of which there is exactly one set whichever slot
-# the partition turns out to be, exactly as there is one Image and one boot.scr.
-# A suffix here would be two names for one fact, and the copy that is never read
-# would be free to drift.
+# WHY THE CHECKSUM IS THE GUARD, measured on the board rather than reasoned.
+# The word under swapper_pg_dir[256] was poisoned at the U-Boot prompt before
+# the load and read back after it:
 #
-# WHAT THE TWO ASSERTIONS CATCH, stated separately because they are not the same
-# claim. The byte count catches a short read, and names it precisely, which the
-# checksum alone would not. The CRC-32 catches any divergence present in DRAM at
-# the moment it runs -- a short read or stale bytes in the middle -- and it is
-# the one of the two that would have caught the failure above. NEITHER can catch
-# a corruption that happens after the check and before the kernel reads the
-# page: the window is now the milliseconds between crc32 and booti instead of
-# the whole load, but it is not zero, and this script cannot make it zero.
+#   => mw.q 0x43e87800 deadbeefdeadbeef 1
+#   => load mmc 0:4 $kernel_addr_r Image
+#   44493312 bytes read in 621 ms (68.3 MiB/s)
+#   => md.q 0x43e87800 1
+#   43e87800: 910fa02190ffef61
+#
+# Three things, and they decide the shape of this block. The load reported the
+# EXACT right size, the byte count of the file this repository builds. It DID
+# write the address -- the poison is gone, so nothing was skipped. And what it
+# wrote is the PREVIOUS kernel's text (early_kvm_mode_cfg+0x10 out of the
+# 2026-09-07 08:12 build). The file on eMMC is itself a mixture and `load` read
+# it faithfully. RFCT-351, RFCT-352.
+#
+# The name carries the slot for the same reason mos-verity-<slot>.env does: one
+# RAUC boot payload is installed into whichever boot slot is inactive, so it
+# ships both slots' files and a slot-neutral name could not be one of them.
 #
 # The four values are cleared first. `env import` leaves whatever a previous
 # boot persisted in place for any key the file does not carry, and the burn
@@ -172,20 +172,28 @@ setenv kernel_crc
 setenv fdt_bytes
 setenv fdt_crc
 
-if load mmc 0:${bootpart} ${digestaddr} mos-boot-digest.env; then
-    env import -t ${digestaddr} ${filesize} || setenv bootfault "mos-boot-digest.env would not import"
+if load mmc 0:${bootpart} ${digestaddr} mos-boot-digest-${slotsuffix}.env; then
+    env import -t ${digestaddr} ${filesize} || setenv bootfault "mos-boot-digest-${slotsuffix}.env would not import"
 else
-    setenv bootfault "no mos-boot-digest.env beside Image"
+    setenv bootfault "no mos-boot-digest-${slotsuffix}.env beside Image"
 fi
 
+# THE SIZE COMPARE IS A FIRST LINE, NOT THE GUARD. It is free, and it names a
+# short read precisely where the checksum would only say "wrong" -- but on the
+# failure this block exists for it is GREEN: the console printed the exact
+# 44493312 the file has, and the bytes underneath were another build's. Never
+# read a passing size compare as "the kernel is the right one"; only the
+# crc32 -v below says that. It is here because a short read is a different
+# fault worth naming, not because it catches this one.
+#
 # `load` reports ${filesize} through env_set_hex, i.e. "%lx": lowercase hex, no
-# 0x prefix, no leading zeros. mos-boot-digest.env spells the byte counts the
-# same way, so this is a string compare and needs no arithmetic -- hush has none
+# 0x prefix, no leading zeros. The digest file spells the byte counts the same
+# way, so this is a string compare and needs no arithmetic -- hush has none
 # without setexpr, and setexpr is hexadecimal (see the header).
 if test -z "${bootfault}"; then
     if load mmc 0:${bootpart} ${kernel_addr_r} Image; then
         if test "${filesize}" != "${kernel_bytes}"; then
-            setenv bootfault "Image: ${filesize} bytes landed, mos-boot-digest.env says ${kernel_bytes}"
+            setenv bootfault "Image: ${filesize} bytes landed, the digest says ${kernel_bytes}"
         elif crc32 -v ${kernel_addr_r} ${filesize} ${kernel_crc}; then
             echo "mos: Image ${kernel_bytes} bytes, crc32 ${kernel_crc} verified in DRAM"
         else
@@ -199,7 +207,7 @@ fi
 if test -z "${bootfault}"; then
     if load mmc 0:${bootpart} ${fdt_addr_r} rk3576-src.dtb; then
         if test "${filesize}" != "${fdt_bytes}"; then
-            setenv bootfault "rk3576-src.dtb: ${filesize} bytes landed, mos-boot-digest.env says ${fdt_bytes}"
+            setenv bootfault "rk3576-src.dtb: ${filesize} bytes landed, the digest says ${fdt_bytes}"
         elif crc32 -v ${fdt_addr_r} ${filesize} ${fdt_crc}; then
             echo "mos: rk3576-src.dtb ${fdt_bytes} bytes, crc32 ${fdt_crc} verified in DRAM"
         else
@@ -210,6 +218,11 @@ if test -z "${bootfault}"; then
     fi
 fi
 
+# WHAT NEITHER ASSERTION CATCHES: a corruption that happens after the check and
+# before the kernel reads the page. The window is now the crc32-to-booti gap
+# instead of the whole load, and it is not zero. This script cannot make it zero
+# and does not pretend to.
+#
 # The same route the missing-verity-env case takes, for the same reason: burn
 # this slot's remaining credits so the next reset moves on instead of retrying a
 # slot we know cannot boot. It is not a permanent loss -- when both slots reach
