@@ -74,6 +74,22 @@ FROM src AS kconfig
 COPY --from=mos-common mos-required.fragment /mos-required.fragment
 COPY kernel/config/x64.fragment /x64.fragment
 
+# The verity content anchor, from the named build context `mos-trust`
+# (`--build-context mos-trust=../../../meta/verity`, wired in
+# boards/x64/bsp/Makefile, which mints it if it is absent). It is the
+# file boards/common/mos-required.fragment names in CONFIG_SYSTEM_TRUSTED_KEYS,
+# and certs/Makefile resolves that relative path against the source tree.
+#
+# PUBLIC MATERIAL. What lands here is an X.509 certificate; the private key
+# stays in meta/ and no stage of this build has it. The build FAILS without the
+# context rather than falling back to an empty keyring, for the same reason the
+# fragment above is not optional: a kernel with CONFIG_SYSTEM_TRUSTED_KEYS=""
+# accepts no root-hash signature at all, and would present as a boot failure
+# far from here.
+COPY --from=mos-trust signer.cert.pem /ksrc/certs/mos-verity-anchor.pem
+RUN grep -q 'BEGIN CERTIFICATE' /ksrc/certs/mos-verity-anchor.pem || { \
+        echo "error: the file the mos-trust build context supplied is not a PEM certificate. CONFIG_SYSTEM_TRUSTED_KEYS names it, and extract-cert would fail in the middle of the compile instead of here" >&2; exit 1; }
+
 # x86_64_defconfig is the base and the two fragments are the delta. The
 # alternative -- one recorded full config, which is what cx3576 keeps -- makes
 # the reason a symbol is set unrecoverable: 6000 lines of generated text carry
@@ -155,6 +171,24 @@ RUN set -eu; cd /ksrc; \
     grep -q "^${want}$" .config || { \
         echo "error: the resolved config's LSM list is not the required one. Wanted ${want}, got $(grep '^CONFIG_LSM=' .config). SELinux that is compiled in but not in the boot list never registers selinuxfs, and the image ships a security module that is present and does nothing." >&2; exit 1; }; \
     echo "config: ${want}"
+
+# ASSERTION 4: CONFIG_SYSTEM_TRUSTED_KEYS, the other string the loop cannot see.
+#
+# It is what makes signed dm-verity mean anything: with an empty value the
+# kernel builds the .builtin_trusted_keys keyring with nothing in it, every
+# root-hash signature fails to find an issuer, and the failure appears at the
+# first boot of an image rather than here. The value is asserted as the
+# fragment's, and the file it names is asserted to exist in the tree that is
+# about to be compiled -- two different failures: a floor that changed, and a
+# build context that did not arrive.
+RUN set -eu; cd /ksrc; \
+    want="$(grep '^CONFIG_SYSTEM_TRUSTED_KEYS=' /mos-required.fragment)"; \
+    [ -n "${want}" ] || { echo "error: boards/common/mos-required.fragment declares no CONFIG_SYSTEM_TRUSTED_KEYS, so this assertion has nothing to compare and would pass over a kernel that trusts nothing" >&2; exit 1; }; \
+    grep -q "^${want}$" .config || { \
+        echo "error: the resolved config's trust anchor is not the required one. Wanted ${want}, got $(grep '^CONFIG_SYSTEM_TRUSTED_KEYS=' .config)." >&2; exit 1; }; \
+    path="$(printf '%s' "${want}" | sed 's/^CONFIG_SYSTEM_TRUSTED_KEYS=//; s/^"//; s/"$//')"; \
+    [ -s "${path}" ] || { echo "error: ${want} names ${path}, which does not exist in the kernel tree. certs/Makefile resolves that path against the source tree, so the compile would fail at extract-cert" >&2; exit 1; }; \
+    echo "config: ${want} ($(stat -c%s "${path}") bytes)"
 
 # ONE ENTRY OF THAT LIST IS NOT SATISFIED, ON EITHER BOARD. The list ends in
 # `bpf` and neither this kernel nor cx3576's builds CONFIG_BPF_LSM, so systemd
