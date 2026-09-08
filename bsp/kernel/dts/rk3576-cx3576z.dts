@@ -18,6 +18,87 @@
 	status = "disabled";
 };
 
+/*
+ * RAMOOPS -- MOVED INTO THE DRAM THE KERNEL IS ACTUALLY GIVEN.
+ *
+ * rk3576-linux.dtsi declares `ramoops@40110000`, 0xe0000 at 0x40110000, and
+ * that address is NOT in the bank U-Boot hands over: the memory node this
+ * board boots with is [0x40200000, top), because TF-A/BL31 keeps the first
+ * 2 MiB of DRAM. The whole vendor region -- 0x40110000..0x401effff -- lies
+ * inside that carve-out, and it is not a latent misdeclaration: pstore
+ * registers the backend, `printk: console [ramoops-1] enabled`, and every
+ * console line since has been written into firmware memory. The board runs,
+ * so BL31 is evidently not being fatally clobbered, but that is luck rather
+ * than a design -- this board's own u-boot.itb loads an ARM Trusted Firmware
+ * segment at 0x400f0000, 0x20000 below the vendor ramoops base.
+ *
+ * WHERE IT GOES, and why this address and not another. The region has to be
+ * (a) inside the bank the kernel was given, so the kernel's own reservation
+ * mechanism can hold it, and (b) outside everything the boot chain writes,
+ * because a warm reset re-runs the boot chain before the kernel reads the
+ * previous boot's bytes -- a region the loader scribbles on is a pstore that
+ * is empty exactly when it matters. The boot chain's own addresses, read out
+ * of the built u-boot.itb and out of boards/cx3576/boot.cmd:
+ *
+ *   0x40060000 / 0x400f0000  BL31 segments        (inside the 2 MiB carve-out)
+ *   0x40800000               U-Boot proper        (TEXT_BASE; relocates UP)
+ *   0x40c00000 / 0x40c00800  scriptaddr / loadaddr
+ *   0x40e00000               pxefile_addr_r
+ *   0x40f00000               verityaddr           (boot.cmd)
+ *   0x42000000               kernel_addr_r
+ *   0x52000000 / 0x52180000  fdt_addr_r / ramdisk_addr_r
+ *
+ * so [0x40200000, 0x40800000) is above the firmware carve-out and below every
+ * address the loader writes. 0x40400000 sits in it with 2 MiB of clearance
+ * from the carve-out and 4 MiB from U-Boot's TEXT_BASE, and -- being 4 MiB
+ * from the base of DRAM -- it is inside the bank on every memory SKU, which a
+ * high address chosen against this 8 GiB unit would not be. It is NOT a
+ * measured-free address: nothing off-board can prove the loader leaves it
+ * alone, so docs/bsp/cx3576-bench.md carries the row that does.
+ *
+ * `no-map` AND NOT `reusable`, and the two are not interchangeable here.
+ * `reusable` hands a region to the allocator on the understanding that a
+ * driver can claim it back; pstore has no such handshake and needs the bytes
+ * to survive a reset UNREAD, so a reusable ramoops is a ramoops the kernel is
+ * entitled to overwrite. Plain reservation -- neither property -- would keep
+ * the region out of the allocator but leave it in the arm64 linear map as
+ * Normal cacheable, while fs/pstore/ram_core.c maps it write-combine
+ * (`persistent_ram_vmap`, MEM_TYPE_WCOMBINE is mem_type 0): two live mappings
+ * of one physical range with mismatched memory types. `no-map` is what removes
+ * the linear-map alias, so the write-combine mapping pstore makes is the only
+ * one. It does not change WHICH of ram_core.c's two mapping paths is taken --
+ * arm64's pfn_valid() answers from memblock_is_memory(), and
+ * memblock_mark_nomap() leaves the range in memblock.memory, so the vmap path
+ * is taken either way -- what changes is that there is no second, cached view
+ * of the same bytes.
+ *
+ * MOVING IT DISCARDS WHAT IS STORED TODAY. The records a device holds at
+ * 0x40110000 are not migrated and are not readable after this change; the
+ * first boot on the new address starts with an empty pstore. That is
+ * accepted: nothing has ever consumed those records, and leaving a console
+ * writing into BL31's memory in order to keep them is the wrong trade.
+ *
+ * The geometry is the vendor's, unchanged: the same total size and the same
+ * four zones (dmesg-0/1 0x18000 each, console 0x80000, pmsg 0x30000). Only
+ * the base and the mapping change, so a boot log from before and after this
+ * commit differs in exactly one number.
+ */
+&{/reserved-memory} {
+	/delete-node/ ramoops@40110000;
+
+	ramoops@40400000 {
+		compatible = "ramoops";
+		reg = <0x0 0x40400000 0x0 0xe0000>;
+		no-map;
+		boot-log-size = <0x8000>;	/* vendor: do not change */
+		boot-log-count = <0x1>;		/* vendor: do not change */
+		console-size = <0x80000>;
+		pmsg-size = <0x30000>;
+		ftrace-size = <0x0>;
+		record-size = <0x14000>;
+	};
+};
+
 &gmac0 {
 	snps,reset-gpio = <&gpio2 RK_PB3 GPIO_ACTIVE_LOW>;
 };
