@@ -1,0 +1,24 @@
+# tty1 is this board's HDMI output, and the product has no GUI.
+#
+# Without this file the console shows a login prompt: 90-systemd.preset says
+# `enable getty@.service`, getty@.service declares DefaultInstance=tty1, and the
+# packed root ends up with etc/systemd/system/getty.target.wants/getty@tty1.service.
+#
+# A PRESET AND NOT A DELETED SYMLINK. An unenabled unit is an absence, not a
+# decision -- one `systemctl preset-all`, one added preset file or one upstream
+# packaging change puts the prompt back. `50-` sorts before `90-systemd.preset`,
+# preset rules are read in basename order across /etc, /run and /usr/lib, and
+# the FIRST match wins, so this resolves the unit to disabled. Same shape and
+# same reason as 50-mos-ssh.preset and 50-mos-nftables.preset.
+#
+# THE CONSOLE IS NOT LOST. `console=tty1` keeps HDMI on the kernel's console
+# list, so an oops or panic still takes the screen (PLAN-088 section 2.2), and a
+# disabled unit is still startable: `systemctl start getty@tty1` turns the
+# display into a login terminal at runtime, with no second boot path and no
+# rebuild. systemd's getty-generator does not re-add one behind this file --
+# it skips virtual consoles by design.
+#
+# The template is disabled rather than the tty1 instance, because autovt@.service
+# is a symlink to it: naming only the instance would leave logind free to spawn a
+# getty on VT switch, which is the same prompt by another route.
+disable getty@.service

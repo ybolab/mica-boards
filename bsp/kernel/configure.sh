@@ -58,6 +58,13 @@ refuse() {
 # description of the SOURCE TREE to the kernel release, and the tree here is a
 # detached FETCH_HEAD with a patch series applied and not committed, so it would
 # stamp "-dirty" and a hash into every module path.
+#
+# THE BOOT LOGO is the fourth group, and it is a board decision rather than a
+# shared one: this board has an HDMI output that shows a login prompt otherwise,
+# and PLAN-088 turns that into a logo. CLUT224 is the only variant kept --
+# fb_find_logo picks by colour depth and this board's fbdev is never below 8
+# bits, so LOGO_LINUX_MONO and LOGO_LINUX_VGA16 (both `default y` under LOGO)
+# would compile two bitmaps nothing can select.
 scripts/config --disable LOCALVERSION_AUTO \
                --disable WL_ROCKCHIP --disable WIFI_BUILD_MODULE \
                --disable AP6XXX --disable BCMDHD \
@@ -66,6 +73,10 @@ scripts/config --disable LOCALVERSION_AUTO \
                --enable RTC_DRV_HYM8563 \
                --enable LEDS_TRIGGERS \
                --enable LEDS_TRIGGER_HEARTBEAT \
+               --enable LOGO \
+               --enable LOGO_LINUX_CLUT224 \
+               --disable LOGO_LINUX_MONO \
+               --disable LOGO_LINUX_VGA16 \
                --set-str AIC_FW_PATH "/lib/firmware"
 
 env "${CROSS[@]}" scripts/kconfig/merge_config.sh -m .config "${FRAGMENT}"
@@ -84,6 +95,23 @@ require '^CONFIG_LEDS_TRIGGER_HEARTBEAT=y'
 require '^# CONFIG_WL_ROCKCHIP is not set'
 refuse '^CONFIG_AP6XXX='
 refuse '^CONFIG_BCMDHD='
+
+# THE LOGO, AND THE SYMBOL THAT WOULD SILENTLY SUPPRESS IT. Both halves matter
+# and only the first is obvious. CONFIG_LOGO_LINUX_CLUT224 is what
+# drivers/video/logo/Makefile turns this board's logo_linux_clut224.ppm into an
+# object; without it the PPM the Dockerfile stages is compiled by nothing and
+# the screen stays blank with every other check green.
+#
+# FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER is refused rather than merely left
+# alone. It is off today, but "off" and "decided to be off" are different
+# facts, and this one is worth pinning: fbcon's deferred path sets
+# logo_shown = FBCON_LOGO_DONTSHOW BEFORE it registers the framebuffers
+# (fbcon.c:3338-3340), so turning it on -- which reads like protection for the
+# logo, and is exactly that for a firmware-painted one -- means this logo is
+# never drawn at all. PLAN-088 section 2.1 carries the measurement.
+require '^CONFIG_LOGO=y'
+require '^CONFIG_LOGO_LINUX_CLUT224=y'
+refuse '^CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER=y'
 
 # THE BOARD'S OWN OPTIONS, AND NOTHING ELSE. This loop used to restate 19
 # symbols that boards/common/mos-required.fragment now pins -- BRIDGE, VETH, the

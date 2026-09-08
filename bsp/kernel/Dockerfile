@@ -34,6 +34,30 @@ COPY kernel/patches/ /patches/
 COPY kernel/dts/rk3576-cx3576z.dts /ksrc/arch/arm64/boot/dts/rockchip/
 RUN bash /bsp/scripts/apply-patches.sh /ksrc /patches patch
 
+# THE BOOT LOGO, derived here rather than committed. The vendor tree's
+# logo_linux_clut224.ppm is REPLACED, which is why this is a file copy and not a
+# fifth entry in kernel/patches/: the payload is 2.2 MB of ASCII PPM, and a
+# patch carrying it would be a 2.2 MB diff against a file whose every line
+# changes. The series stays a list of source edits.
+#
+# rootfs/assets/splash.png is the master, and it was a source asset with no
+# consumer until PLAN-088 (docs/design/display.md section 4). Deriving the PPM
+# from it at build time keeps ONE copy of the artwork in the tree; a generated
+# PPM committed beside the PNG is a second copy nothing forces to agree with the
+# first. mklogo.py is pure integer arithmetic for the reason the four pins below
+# exist -- two runs on one master produce one byte string, which a float
+# resampler or a set-ordered quantiser would not.
+#
+# 720x405 IS A CONSTRAINT, NOT A PREFERENCE. fb_prepare_logo drops the logo when
+# its height exceeds the mode's yres (fbmem.c:650-653) and fb_show_logo_line
+# reduces the copy count to zero when its width will not fit xres (fbmem.c:513);
+# both failures are a blank screen, not an error. This geometry fits every mode
+# from 800x600 up, so a monitor that negotiates less than 1080p still shows it.
+COPY kernel/logo/mklogo.py /bsp/kernel/logo/mklogo.py
+COPY rootfs/assets/splash.png /bsp/kernel/logo/splash.png
+RUN python3 /bsp/kernel/logo/mklogo.py /bsp/kernel/logo/splash.png \
+        /ksrc/drivers/video/logo/logo_linux_clut224.ppm 720 405
+
 # Needs the named build context: `--build-context mos-common=../../common`,
 # wired in the board Makefile. A bare build without it fails here, loudly.
 COPY kernel/config/kernel-cx3576z.config /ksrc/.config
