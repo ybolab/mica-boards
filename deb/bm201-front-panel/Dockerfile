@@ -10,6 +10,7 @@ ARG MOS_DEB_VERSION
 ARG MOS_DEB_ARCH
 ARG SOURCE_DATE_EPOCH
 RUN set -eu; \
+    chmod 0755 /stage/usr/sbin/bm201-front-panel /stage/usr/lib/mos/bm201-front-panel-stop; \
     rm /stage/usr/lib/systemd/system/multi-user.target.d/bm201-front-panel.conf; \
     rmdir /stage/usr/lib/systemd/system/multi-user.target.d; \
     install -d /stage/etc/systemd/system/multi-user.target.wants; \
