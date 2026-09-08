@@ -108,7 +108,40 @@ if test -n "${machine_id}"; then
     setenv machineid_arg "systemd.machine_id=${machine_id}"
 fi
 
-setenv consoleargs "console=ttyFIQ0,1500000 earlycon=uart8250,mmio32,0x2ad40000"
+# CONSOLE ORDER IS LOAD-BEARING, AND IT IS THE FIRST THING TO GET WRONG HERE.
+# Every console= receives printk, but /dev/console -- where init, systemd and
+# every service's stdout go -- is the LAST one: __add_preferred_console() sets
+# preferred_console on each entry it parses, so the last assignment wins
+# (kernel/printk/printk.c:2437-2468). tty1 is this board's HDMI output, so
+# tty1 FIRST and the serial console LAST is what puts kernel messages on the
+# screen while leaving userspace output on the cable. Swapping them is a
+# working boot that moves the console onto a customer's display and silences
+# serial, which is why verify asserts the ORDER and not the presence.
+#
+# loglevel=5, AND IT IS NOT AN ARBITRARY NUMBER. fbcon draws the boot logo only
+# when console_loglevel EXCEEDS CONFIG_CONSOLE_LOGLEVEL_QUIET, which this kernel
+# sets to 4 (fbcon_init, drivers/video/fbdev/core/fbcon.c:1009-1010) -- so
+# `quiet`, which sets exactly 4, suppresses the logo, and any smaller value does
+# too. 5 is the floor that shows it, and it leaves EMERG..WARNING printing while
+# dropping NOTICE and INFO, so a healthy boot is quiet without being mute.
+#
+# loglevel=0 WOULD BE WORSE THAN A BLANK SCREEN and must never be set here:
+# suppress_message_printing() drops a message when `level >= console_loglevel`,
+# which at zero includes KERN_EMERG, and console_verbose() -- the call an oops
+# and a panic use to raise the level -- is guarded by `if (console_loglevel)`
+# and does nothing at zero (printk.c:1230-1233, :2567-2571). The crash would be
+# invisible on HDMI and on serial. Upstream warns about exactly this in
+# init/main.c:255-258.
+#
+# fbcon=logo-pos:center,logo-count:1. fb_logo_count defaults to -1, which means
+# ONE LOGO PER ONLINE CPU (fbmem.c:695); on this eight-core SoC that is a row of
+# logos rather than a splash. logo-count:1 pins one and logo-pos:center places
+# it, since fbcon otherwise draws at the top-left corner.
+#
+# PLAN-088 carries the measurements, and boards/cx3576/board.env's
+# BOARD_CMDLINE_ARGS carries the same console list -- verify compares the two,
+# so this line and that one cannot drift apart.
+setenv consoleargs "console=tty1 console=ttyFIQ0,1500000 earlycon=uart8250,mmio32,0x2ad40000 loglevel=5 fbcon=logo-pos:center,logo-count:1"
 setenv rootargs "root=/dev/dm-0 rootfstype=squashfs ro rootwait"
 
 # rauc.slot= is how rauc identifies which slot it is running from. It cannot be
