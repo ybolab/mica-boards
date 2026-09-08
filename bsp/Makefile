@@ -1,6 +1,6 @@
 # Build and flash the CX3576-Z Alpine image.
 # Layout: U-Boot at LBA 64, boot at 16 MiB, and rootfs at 80 MiB.
-.PHONY: all uboot uboot-mos kernel rootfs image rkdeveloptool-macos flash flash-maskrom flash-rootfs-offline \
+.PHONY: all uboot uboot-mos kernel rootfs image rkdeveloptool-macos flash flash-maskrom flash-mos flash-rootfs-offline \
 	source-check clean
 
 # WHERE THE ARTEFACTS GO. `_out/boards/<board>/`, not `out/` beside this file.
@@ -17,6 +17,23 @@
 # this Makefile -- and conflating the two is what made "point BOARD_DIR at
 # prebuilt artefacts" also repoint the firmware.
 BSP_OUT ?= ../../../_out/boards/cx3576
+
+# WHERE THE PRODUCT IMAGE IS, for `flash-mos`. `_out/<board>/` is the top-level
+# build's output directory -- `make os-image-cx3576` writes it -- and it is
+# neither BSP_OUT nor BOARD_DIR. This Makefile is the only place in the tree
+# that knows how to talk to the board, which is why the target for the mos
+# image is here and not at the top level; the image it writes is not this
+# directory's output, which is why the path is its own variable.
+#
+# The file name is READ from the layout, never copied into a second place:
+# board.env owns IMAGE_LATEST_NAME and says so at its head. $(shell ...) here
+# rather than in a recipe, unlike FROM_SH below, because the value is a name and
+# not a command: it is expanded only when a flash target uses MOS_IMAGE, and an
+# unreadable board.env stops make with the $(error) rather than silently
+# handing rkdeveloptool a path ending in a slash.
+MOS_OUT ?= ../../../_out/cx3576
+MOS_IMAGE_NAME = $(or $(shell . ../board.env && printf '%s' "$$IMAGE_LATEST_NAME"),$(error cannot read IMAGE_LATEST_NAME from ../board.env))
+MOS_IMAGE ?= $(MOS_OUT)/$(MOS_IMAGE_NAME)
 
 
 TOOLS_DIR ?= tools
@@ -107,21 +124,32 @@ source-check:
 		rc=$$?; test "$$rc" -eq 1 || exit "$$rc"; \
 	fi
 
-# Read back the raw boot area (GPT + idblock + u-boot.itb, first 16 MiB) and
-# compare it against the source image; a partial or corrupt write here is the
-# one failure that bricks the board past the recovery key.
-define verify-boot-area
-	$(RKDEVELOPTOOL) rl 0 32768 $(BSP_OUT)/.verify-boot.img
-	head -c 16777216 $(BSP_OUT)/disk.img | cmp - $(BSP_OUT)/.verify-boot.img
-	rm -f $(BSP_OUT)/.verify-boot.img
-	@echo "Boot area (loader + u-boot.itb) verified against $(BSP_OUT)/disk.img."
+# Read the WHOLE written image back off the board and compare it with the file
+# that was written. $(1) is that file.
+#
+# It used to read back the first 16 MiB, and everything that decides whether the
+# machine runs is past it: board.env puts boot-a at 18 MiB and rootfs-a at 146
+# MiB. A flash reported success and left a hole 22 MiB past the last verified
+# byte; the board booted a kernel assembled from two builds and died in
+# paging_init (docs/task/RFCT-351.md, closed by docs/task/RFCT-353.md). The
+# reasoning that earned the boot area its read-back is intact and still runs
+# first -- it is the first thing scripts/verify-flash.sh reads, and its comment
+# moved there with it.
+#
+# The arithmetic lives in the script rather than in this macro because a
+# recipe line is not testable and a script driven by a stub rkdeveloptool is:
+# tests/cx3576-flash-verify-test.sh drives these targets with one, and checks
+# the arguments, the sector arithmetic against board.env, and that a hole in the
+# image turns the run red before `rd` reboots the board into it.
+define verify-written-image
+	RKDEVELOPTOOL='$(RKDEVELOPTOOL)' bash scripts/verify-flash.sh $(1)
 endef
 
 # Flash the complete image while the board is in Loader mode.
 flash:
 	@echo "WARNING: Keep board power and USB connected until rkdeveloptool rd completes."
 	$(RKDEVELOPTOOL) wl 0 $(BSP_OUT)/disk.img
-	$(verify-boot-area)
+	$(call verify-written-image,$(BSP_OUT)/disk.img)
 	$(RKDEVELOPTOOL) rd
 
 # Recover from Maskrom with the pinned vendor Loader, then flash the full image.
@@ -130,7 +158,21 @@ flash-maskrom:
 	$(SHA256) -c uboot/MiniLoaderAll.bin.sha256
 	$(RKDEVELOPTOOL) db $(VENDOR_MINILOADER)
 	$(RKDEVELOPTOOL) wl 0 $(BSP_OUT)/disk.img
-	$(verify-boot-area)
+	$(call verify-written-image,$(BSP_OUT)/disk.img)
+	$(RKDEVELOPTOOL) rd
+
+# Flash the mos PRODUCT image -- the A/B image `make os-image-cx3576` builds,
+# not the Alpine demo image the two targets above write.
+#
+# It existed only as a paragraph in docs/user/install.md telling a human to
+# reach for rkdeveloptool by hand, which meant the image the fleet actually
+# runs was the one image with no read-back at all -- and it is the path the
+# board of docs/task/RFCT-351.md took. Same three steps and the same
+# verification as `flash`; MOS_IMAGE selects a build other than the latest.
+flash-mos:
+	@echo "WARNING: Keep board power and USB connected until rkdeveloptool rd completes."
+	$(RKDEVELOPTOOL) wl 0 $(MOS_IMAGE)
+	$(call verify-written-image,$(MOS_IMAGE))
 	$(RKDEVELOPTOOL) rd
 
 # Flash only rootfs when the kernel and partition layout are unchanged.

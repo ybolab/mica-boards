@@ -14,6 +14,17 @@
 #   env/mmc.c relocates the env to a partition END instead of the offsets
 # * boot.scr is the only auto-discoverable entry: bootmeth order pinned to script;
 #   the rockusb rescue tail and the PREBOOT recovery key are preserved
+# * CRC32_VERIFY is on, because boot.scr checks the kernel and the dtb it just
+#   loaded against mos-boot-digest.env before booti. `load` reporting success
+#   means the FAT directory had an entry and the read did not error; a board
+#   booted a MIXTURE of two kernel builds while the console printed the full
+#   44493312 bytes read (RFCT-351/RFCT-352). CMD_CRC32 alone gives a crc32 that
+#   can only write its answer to memory, and reading it back needs a byteswap
+#   and an unpadded "%llx" -- two spellings nothing checks. `crc32 -v` compares
+#   in one command, returns the verdict as an exit status hush can branch on,
+#   and prints the two values when they differ. Losing it does not degrade the
+#   script, it BRICKS it: an unknown flag is a usage error, the script reads
+#   that as a failed verification and burns the slot.
 # * BOOTCOMMAND clears boot_targets first. A non-empty boot_targets overrides the
 #   device-tree bootdev-order, and unlike the ENV_IS_NOWHERE variant this stage's
 #   env persists in eMMC, so a value left behind by a saveenv or by hand at the
@@ -45,6 +56,7 @@ scripts/config --disable ENV_IS_NOWHERE \
                --set-val ENV_MMC_EMMC_HW_PARTITION 0 \
                --enable SAVEENV --enable CMD_SAVEENV \
                --enable CMD_SETEXPR --enable CMD_SOURCE --enable CMD_IMPORTENV \
+               --enable CMD_CRC32 --enable CRC32_VERIFY \
                --enable CMD_FS_GENERIC --enable CMD_FAT --enable CMD_BOOTI --enable CMD_PART \
                --enable LEGACY_IMAGE_FORMAT --enable HUSH_PARSER \
                --disable ENV_MMC_USE_DT --disable ENV_MMC_USE_SW_PARTITION \
@@ -56,7 +68,11 @@ make olddefconfig
 # The two ENV_MMC_* values place the redundant env on the eMMC user area; if
 # olddefconfig ever drops them (v2026.07 spellings per
 # docs/design/uboot-ab-handshake.md 1.2, env/Kconfig:738,748) the env silently
-# lands on the default MMC device -- so their absence must be red.
+# lands on the default MMC device -- so their absence must be red. CRC32_VERIFY
+# is in the same list for the same reason and a sharper consequence: it is
+# `default n`, so it is exactly the kind of symbol an olddefconfig drops, and a
+# blob without it refuses BOTH slots on the first boot rather than misbehaving
+# quietly.
 for line in \
     CONFIG_ENV_IS_IN_MMC=y \
     CONFIG_ENV_OFFSET=0x1000000 \
@@ -67,6 +83,8 @@ for line in \
     CONFIG_ENV_MMC_EMMC_HW_PARTITION=0 \
     CONFIG_CMD_SETEXPR=y \
     CONFIG_CMD_SAVEENV=y \
+    CONFIG_CMD_CRC32=y \
+    CONFIG_CRC32_VERIFY=y \
     CONFIG_HUSH_PARSER=y; do
     grep -q "^${line}$" .config || {
         echo "ERROR: ${line} missing from mos .config" >&2
