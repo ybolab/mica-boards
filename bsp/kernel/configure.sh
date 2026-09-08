@@ -82,6 +82,30 @@ scripts/config --disable LOCALVERSION_AUTO \
 env "${CROSS[@]}" scripts/kconfig/merge_config.sh -m .config "${FRAGMENT}"
 make "${CROSS[@]}" olddefconfig
 
+# THE TRUST ANCHOR, and the two ways it goes wrong. The value is a string, so
+# the fragment loop at the bottom of this file -- which reads =y lines only --
+# cannot see it, exactly as it cannot see the LSM list. An empty value builds a
+# kernel whose .builtin_trusted_keys keyring is empty, so every root-hash
+# signature fails to find an issuer at the first boot rather than here; a value
+# naming a file that the mos-trust build context did not deliver fails in the
+# middle of the compile, at extract-cert.
+trusted_keys="$(grep '^CONFIG_SYSTEM_TRUSTED_KEYS=' "${FRAGMENT}")"
+[ -n "${trusted_keys}" ] || {
+    echo "error: ${FRAGMENT} declares no CONFIG_SYSTEM_TRUSTED_KEYS, so this assertion has nothing to compare and would pass over a kernel that trusts nothing" >&2
+    exit 1
+}
+require "^${trusted_keys}$"
+anchor="$(printf '%s' "${trusted_keys}" | sed 's/^CONFIG_SYSTEM_TRUSTED_KEYS=//; s/^"//; s/"$//')"
+[ -s "${anchor}" ] || {
+    echo "error: ${trusted_keys} names ${anchor}, which does not exist in the kernel tree. certs/Makefile resolves that path against the source tree; the compile would fail at extract-cert" >&2
+    exit 1
+}
+grep -q 'BEGIN CERTIFICATE' "${anchor}" || {
+    echo "error: ${anchor} is not a PEM certificate. The mos-trust build context delivered something else, and extract-cert would refuse it in the middle of the compile" >&2
+    exit 1
+}
+echo "config: ${trusted_keys} ($(stat -c%s "${anchor}") bytes)"
+
 require "^CONFIG_SQUASHFS_ZSTD=y"
 require "^CONFIG_OVERLAY_FS=y"
 require "^CONFIG_MEMCG=y"

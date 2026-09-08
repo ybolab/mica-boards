@@ -62,6 +62,16 @@ RUN python3 /bsp/kernel/logo/mklogo.py /bsp/kernel/logo/splash.png \
 # wired in the board Makefile. A bare build without it fails here, loudly.
 COPY kernel/config/kernel-cx3576z.config /ksrc/.config
 COPY --from=mos-common mos-required.fragment /mos-required.fragment
+
+# The verity content anchor, from the named build context `mos-trust`
+# (`--build-context mos-trust=../../../meta/verity`, wired in
+# boards/cx3576/bsp/Makefile, which mints it if it is absent). It is the file
+# boards/common/mos-required.fragment names in CONFIG_SYSTEM_TRUSTED_KEYS, and
+# certs/Makefile resolves that relative path against the source tree. Public
+# material only: an X.509 certificate goes in, the private half never leaves
+# meta/. configure.sh asserts both the value and this file.
+COPY --from=mos-trust signer.cert.pem /ksrc/certs/mos-verity-anchor.pem
+
 COPY kernel/configure.sh /bsp/kernel/configure.sh
 RUN bash /bsp/kernel/configure.sh /ksrc /mos-required.fragment
 

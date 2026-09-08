@@ -92,6 +92,42 @@ for line in \
     }
 done
 
+# THE FIT SIGNATURE CAPABILITY, WHICH THIS STAGE DOES NOT ENABLE AND MUST NOT
+# LOSE. Every symbol below is already =y before this file runs: they come with
+# the Rockchip defconfig chain, because the SPL loads u-boot.itb as a FIT. That
+# is exactly why they are asserted rather than enabled -- an inherited symbol
+# has no line anywhere in this repository saying it is wanted, so a defconfig
+# that stopped selecting one would take the capability away silently and the
+# first evidence would be a board that boots an unsigned image happily.
+#
+# WHAT THEY DO AND DO NOT BUY, measured on the built blob (P1 of plan
+# 20260908-1428): with these on, u-boot-rockchip.bin carries the verification
+# code and its messages ("Failed to verify required signature '%s'"), and its
+# CONTROL FDT carries no /signature node at all -- so no key is required and a
+# FIT with no signature boots. The enforcement half is a public key written into
+# the control FDT with `required = "conf"`, and it is not here yet.
+#
+# LEGACY_IMAGE_FORMAT is in the same list for the opposite reason: it is
+# asserted PRESENT because today's boot path needs it. boot.scr is a legacy
+# uImage (build/src/tools/mkimage.ts: `mkimage -T script -C none`), so a build
+# that dropped this symbol would refuse the only entry bootflow can find. It is
+# also the unsigned path the file-based A/B design has to remove, which cannot
+# happen before boot.scr is replaced by a signed FIT.
+for line in \
+    CONFIG_FIT=y \
+    CONFIG_FIT_SIGNATURE=y \
+    CONFIG_FIT_FULL_CHECK=y \
+    CONFIG_IMAGE_SIGN_INFO=y \
+    CONFIG_RSA=y \
+    CONFIG_RSA_VERIFY=y \
+    CONFIG_SPL_FIT_SIGNATURE=y \
+    CONFIG_LEGACY_IMAGE_FORMAT=y; do
+    grep -q "^${line}$" .config || {
+        echo "ERROR: ${line} missing from mos .config" >&2
+        exit 1
+    }
+done
+
 grep -q '^CONFIG_BOOTCOMMAND="setenv boot_targets; bootmeth order script; bootflow scan -lb; echo BOOT FAILED - entering rockusb; rockusb 0 mmc 0"' .config || {
     echo "ERROR: this stage's own BOOTCOMMAND is not what landed in the mos .config" >&2
     exit 1
