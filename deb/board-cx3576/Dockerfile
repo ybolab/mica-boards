@@ -54,7 +54,8 @@ RUN set -eu; \
     install -d -m 0755 "${ROOT}/etc/rauc" "${ROOT}/etc/repart.d" "${ROOT}/etc/mos" \
         "${ROOT}/etc/systemd/system/multi-user.target.wants" \
         "${ROOT}/usr/lib/mos" "${ROOT}/usr/lib/systemd/system" \
-        "${ROOT}/usr/lib/udev/rules.d" "${ROOT}/usr/lib/modules" \
+        "${ROOT}/usr/lib/udev/rules.d" "${ROOT}/usr/lib/systemd/network" \
+        "${ROOT}/usr/lib/modules" \
         "${ROOT}/usr/lib/firmware" "${ROOT}/usr/lib/mos/board/${LAYOUT_BOARD}"; \
     \
     # The rendered configuration. /etc is ordinary payload and carries no \
@@ -139,6 +140,17 @@ RUN set -eu; \
         for r in /in/hwinit/*-mos-"${n}"-*.rules; do \
             [ -e "${r}" ] || continue; \
             install -m 0644 "${r}" "${ROOT}/usr/lib/udev/rules.d/$(basename "${r}")"; \
+        done; \
+        # ...and the systemd .link files beside them, same glob shape and same \
+        # reason: a fact's udev-side payload ships with the fact rather than \
+        # being named here. 60-mos-mac-stable.link is what stops systemd's own \
+        # 99-default.link MACAddressPolicy=persistent from painting a \
+        # machine-id-derived address over a port hwinit-mac is about to \
+        # assign; without it that program is a no-op on this board, so the \
+        # file is part of the mechanism and not decoration. \
+        for l in /in/hwinit/*-mos-"${n}"-*.link; do \
+            [ -e "${l}" ] || continue; \
+            install -m 0644 "${l}" "${ROOT}/usr/lib/systemd/network/$(basename "${l}")"; \
         done; \
     done; \
     \
