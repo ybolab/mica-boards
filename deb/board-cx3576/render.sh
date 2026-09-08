@@ -140,19 +140,14 @@ tree that already has them, e.g. BSP_OUT=/srv/mos/_out/boards/${MOS_BOARD}")
 # declaration. BOOT_SLOT_REQUIRED_FILES is what a slot must CONTAIN; two of its
 # entries are BSP artifacts and the rest are made during assembly, so they are
 # separated by what produces them rather than by name:
-#   @SLOT@       -- the per-slot verity parameters, written by the assembler
+#   @SLOT@       -- the per-slot verity parameters and the per-slot boot digest,
+#     both written by the assembler
 #   BOOT_SCRIPT_NAME -- compiled from BOOT_CMD_SOURCE, which is staged below
-#   BOOT_DIGEST_ENV_NAME -- the sizes and CRC-32s of the two BSP artifacts,
-#     computed by the assembler from the copies it has just staged. It is the
-#     one assembler-written entry that carries no @SLOT@, because it describes
-#     this boot partition's own files rather than the rootfs slot it is paired
-#     with; `:-` because a board that declares no digest file declares no key.
 BOOT_INPUTS=""
 for f in ${BOOT_SLOT_REQUIRED_FILES}; do
     case "${f}" in
     *'@SLOT@'*) continue ;;
     "${BOOT_SCRIPT_NAME}") continue ;;
-    "${BOOT_DIGEST_ENV_NAME:-}") continue ;;
     esac
     BOOT_INPUTS="${BOOT_INPUTS} ${f}"
     require_bsp "${BSP_OUT}/kernel/${f}" kernel
