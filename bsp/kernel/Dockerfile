@@ -5,13 +5,8 @@
 #   make virt-arm64-kernel         -> _out/boards/virt-arm64/kernel/{Image,modules.tar,config,kernel.release}
 #   make virt-arm64-kernel-config  -> rewrites config/virt-arm64.config from this build
 #
-# WHY THIS EXISTS. The boot contract is `dm-mod.create=` on the kernel command
-# line with no initrd, which needs CONFIG_DM_INIT. Debian's linux-image-arm64
-# does not set it, so that kernel would accept the verity table GRUB writes and
-# ignore it silently, leaving no root at all -- and the usual repair is an
-# initramfs that re-parses the very line GRUB just wrote, which is a second
-# implementation of the one boot contract. x64 shipped exactly that until
-# PLAN-074; this board is built so as never to acquire it. PLAN-085 decides.
+# This producer embeds the explicit public content anchors and configures
+# signature-required verity, storage and watchdog support for native early init.
 #
 # CROSS-COMPILED, NOT EMULATED. `FROM --platform=$BUILDPLATFORM` pins this to
 # the builder's own architecture and the toolchain does the crossing, exactly as
@@ -49,7 +44,7 @@ COPY kernel/versions.env /versions.env
 # The tag is fetched and the TREE is hashed, not a tarball: a release tarball
 # can be re-rolled and a tag can be moved, while `git archive` of the tag is a
 # deterministic byte stream over the source that is actually compiled. This is
-# pkgs/rauc/Dockerfile's discipline, reused rather than reinvented.
+# Shared pinned source-fetch discipline.
 #
 # A PENDING pin prints the hash it computed and fails, with deliberately no
 # environment variable that softens it: a pin that only warns floats for as
@@ -278,11 +273,8 @@ RUN set -eu; cd /ksrc; \
     done; \
     echo "kernel: dm-init, dm-verity and squashfs are in the compiled image"
 
-# The artifact is named `Image`, which is what the arm64 kernel build produces
-# and what boards/virt-arm64/deb/kernel-virt-arm64/stage.sh copies. The name it
-# takes ON THE BOOT PARTITION is `vmlinuz`, from SLOT_KERNEL_NAME in
-# boards/virt-arm64/board.env -- a layout fact read by the same grub.cfg shape
-# x64 uses, and deliberately not this artifact path.
+# Export kernel and support inputs independently from userspace. The component
+# producer signs the resulting UKI and binds the matching support identity.
 FROM scratch AS artifact
 COPY --from=build /ksrc/arch/arm64/boot/Image /
 COPY --from=build /ksrc/.config /config

@@ -44,20 +44,14 @@ CONFIG_PCI_HOST_GENERIC=y
 CONFIG_BLK_DEV=y
 
 # --- how the partitions are read --------------------------------------------
-# GPT, because every partition in boards/virt-arm64/board.env is addressed by
-# its PARTUUID and dm-init resolves `PARTUUID=` through name_to_dev_t, which
-# reads the GPT entry's own GUID. Without EFI_PARTITION the verity table names
-# a device that never appears and the boot stops at rootwait.
+# GPT exposes the fixed SYSTEM/DATA/ESP identities used by authenticated early init.
 CONFIG_PARTITION_ADVANCED=y
 CONFIG_EFI_PARTITION=y
 CONFIG_MSDOS_PARTITION=y
 
 # --- the filesystems the layout mounts --------------------------------------
-# ext4 for META, STATE, EPHEMERAL and DATA; vfat for the ESP and both boot
-# partitions, which boot.mount mounts at /boot. The three NLS tables are what
-# vfat needs to read a FAT directory at all -- without codepage 437 and
-# iso8859-1 the mount fails with "IO charset ... not found", which on this
-# board would be RAUC unable to reach grubenv.
+# ext4 backs SYSTEM and DATA; vfat backs the ESP and its native boot records.
+# Built-in NLS support is required to mount the ESP before selecting entries.
 CONFIG_EXT4_FS=y
 CONFIG_EXT4_FS_POSIX_ACL=y
 CONFIG_EXT4_FS_SECURITY=y
@@ -90,10 +84,8 @@ CONFIG_TTY=y
 CONFIG_UNIX98_PTYS=y
 
 # --- firmware and boot ------------------------------------------------------
-# The firmware (AAVMF) boots GRUB from the ESP and GRUB loads this kernel, so
-# EFI_STUB is not on the boot path today. EFI itself is: efivarfs is how
-# anything on the device reads or writes a UEFI variable, and systemd checks for
-# it to decide whether the machine booted through firmware at all.
+# Firmware authenticates systemd-boot and the signed UKI. EFI_STUB launches the
+# embedded kernel/initramfs; efivarfs exposes the native boot handoff variables.
 CONFIG_EFI=y
 CONFIG_EFI_STUB=y
 CONFIG_EFIVAR_FS=y
@@ -203,3 +195,8 @@ CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
 # line -- the recorded config/virt-arm64.config is where the resulting answer
 # is reviewed, and a hundred `is not set` lines here would be a second copy of
 # it.
+
+# The acceptance VM exposes the same PCI watchdog as x64.
+CONFIG_WATCHDOG_NOWAYOUT=y
+CONFIG_WATCHDOG_SYSFS=y
+CONFIG_I6300ESB_WDT=y
