@@ -14,3 +14,4 @@
 0006-rk3576-generic-cx3576z-usb-host-led-boot-order.patch
 0007-rk3576-generic-cx3576z-recovery-key-saradc.patch
 0008-mos-signed-file-boot.patch
+0009-rk3576-enable-watchdog-clocks.patch

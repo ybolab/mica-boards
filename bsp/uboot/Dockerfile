@@ -83,6 +83,7 @@ FROM build AS build-mos
 ARG DDR_BLOB=rk3576_ddr_lp4_2112MHz_lp5_2736MHz_v1.12.bin
 ARG BL31_BLOB=rk3576_bl31_v1.24.elf
 COPY build-mos.sh embed-trust.sh /bsp/uboot/
+COPY tests/ /bsp/uboot/tests/
 COPY mos-file-boot.c mos-records.h /uboot/common/
 COPY --from=mos-boot-trust signer.cert.pem /mos-boot-trust.crt
 RUN bash /bsp/uboot/build-mos.sh /uboot /rkbin "${DDR_BLOB}" "${BL31_BLOB}" /mos-boot-trust.crt

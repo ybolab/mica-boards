@@ -28,10 +28,15 @@ done
 for symbol in ENV_IS_IN_MMC ENV_REDUNDANT_UPGRADE CMD_SAVEENV CMD_SOURCE CMD_BOOTI LEGACY_IMAGE_FORMAT USE_PREBOOT; do
     if grep -qx "CONFIG_${symbol}=y" .config; then echo "error: forbidden ${symbol}" >&2; exit 1; fi
 done
+bash "$TOOLS_DIR/tests/watchdog.sh" "$SRC"
 make -j8 CROSS_COMPILE=aarch64-linux-gnu- ROCKCHIP_TPL="$DDR" BL31="$BL31"
 bash "$TOOLS_DIR/embed-trust.sh" u-boot.dtb "$CERTIFICATE" mos-control.dtb "$SRC/tools"
 make -j8 CROSS_COMPILE=aarch64-linux-gnu- ROCKCHIP_TPL="$DDR" BL31="$BL31" EXT_DTB="$SRC/mos-control.dtb"
 cmp u-boot.dtb mos-control.dtb
+wdt_node=/soc/watchdog@2ace0000
+[ "$(fdtget -t s -d okay u-boot.dtb "$wdt_node" status)" = okay ]
+[ "$(fdtget -t s u-boot.dtb "$wdt_node" compatible)" = 'rockchip,rk3576-wdt snps,dw-wdt' ]
+[ "$(fdtget -t s u-boot.dtb "$wdt_node" clock-names)" = 'tclk pclk' ]
 [ "$(stat -c%s u-boot-rockchip.bin)" -le 16744448 ]
 aarch64-linux-gnu-nm u-boot | grep -c ' T mos_file_boot$' >/dev/null
 cp .config mos.config

@@ -128,7 +128,7 @@ void __noreturn mos_file_boot(void)
 	unsigned char *copies;
 	char filename[96];
 	loff_t bytes, loaded;
-	int slot, next;
+	int slot, next, ret;
 
 	disable_ctrlc(1);
 	/* ENV_IS_NOWHERE prevents persistent commands from entering any init phase. */
@@ -136,8 +136,17 @@ void __noreturn mos_file_boot(void)
 		recovery("verification policy unavailable");
 	if (!button_get_by_label("recovery", &button) && button_get_state(button) == BUTTON_ON)
 		recovery("local recovery key");
-	if (uclass_get_device(UCLASS_WDT, 0, &watchdog) || wdt_start(watchdog, 120000, 0))
+	ret = uclass_get_device(UCLASS_WDT, 0, &watchdog);
+	if (ret) {
+		printf("MOS FIT watchdog probe failed: %d\n", ret);
 		recovery("required boot watchdog unavailable");
+	}
+	ret = wdt_start(watchdog, 120000, 0);
+	if (ret) {
+		printf("MOS FIT watchdog start failed: %d\n", ret);
+		recovery("required boot watchdog could not start");
+	}
+	puts("MOS FIT boot watchdog armed\n");
 	mmc = find_mmc_device(0);
 	if (!mmc || mmc_init(mmc) || IS_SD(mmc) || blk_select_hwpart_devnum(UCLASS_MMC, 0, 0))
 		recovery("eMMC user area unavailable");
