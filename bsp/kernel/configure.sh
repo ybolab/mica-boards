@@ -82,6 +82,11 @@ scripts/config --disable LOCALVERSION_AUTO \
 env "${CROSS[@]}" scripts/kconfig/merge_config.sh -m .config "${FRAGMENT}"
 make "${CROSS[@]}" olddefconfig
 
+for option in WATCHDOG_NOWAYOUT WATCHDOG_SYSFS DW_WATCHDOG CMDLINE_FORCE; do
+    grep -qx "CONFIG_${option}=y" .config || { echo "missing signed-boot requirement: ${option}" >&2; exit 1; }
+done
+grep -q '^CONFIG_CMDLINE=".*dm_verity.require_signatures=1' .config
+
 # THE TRUST ANCHOR, and the two ways it goes wrong. The value is a string, so
 # the fragment loop at the bottom of this file -- which reads =y lines only --
 # cannot see it, exactly as it cannot see the LSM list. An empty value builds a

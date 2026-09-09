@@ -1,0 +1,184 @@
+// SPDX-License-Identifier: GPL-2.0+
+/* Fixed signed-FIT policy. Persistent storage contains data, never commands. */
+#include <blk.h>
+#include <bootm.h>
+#include <button.h>
+#include <command.h>
+#include <console.h>
+#include <dm.h>
+#include <env.h>
+#include <fs.h>
+#include <hang.h>
+#include <image.h>
+#include <malloc.h>
+#include <memalign.h>
+#include <mmc.h>
+#include <part.h>
+#include <wdt.h>
+#include <asm/unaligned.h>
+#include <u-boot/crc.h>
+#include "mos-records.h"
+
+#define MOS_ENV_SIZE 65536
+#define MOS_ENV_BLOCKS (MOS_ENV_SIZE / 512)
+#define MOS_FIT_ADDRESS 0x60000000UL
+#define MOS_FIT_LIMIT (128 * 1024 * 1024)
+static const unsigned long env_blocks[2] = { 32768, 34816 };
+char mos_deployment_id[65];
+
+static int valid_environment(const unsigned char *bytes)
+{
+	return get_unaligned_le32(bytes) == crc32(0, bytes + 5, MOS_ENV_SIZE - 5);
+}
+
+static int decode_environment(const unsigned char *bytes, struct mos_boot_records *records)
+{
+	const char *value = (const char *)bytes + 17;
+	unsigned int end;
+
+	if (memcmp(bytes + 5, "mos_entries=", 12))
+		return -1;
+	for (end = 17; end < MOS_ENV_SIZE && bytes[end]; end++)
+		;
+	if (end - 17 > MOS_BOOT_VALUE_LIMIT || end + 1 >= MOS_ENV_SIZE)
+		return -1;
+	for (; end < MOS_ENV_SIZE; end++)
+		if (bytes[end])
+			return -1;
+	return mos_boot_parse(value, records);
+}
+
+static int read_environment(struct blk_desc *disk, unsigned char *copies,
+			    struct mos_boot_records *records)
+{
+	int valid[2], slot, i;
+
+	for (i = 0; i < 2; i++) {
+		unsigned char *copy = copies + i * MOS_ENV_SIZE;
+
+		valid[i] = blk_dread(disk, env_blocks[i], MOS_ENV_BLOCKS, copy) == MOS_ENV_BLOCKS
+			&& valid_environment(copy);
+	}
+	slot = mos_boot_slot(valid[0], copies[4], valid[1], copies[MOS_ENV_SIZE + 4]);
+	if (slot < 0 || decode_environment(copies + slot * MOS_ENV_SIZE, records))
+		return -1;
+	return slot;
+}
+
+static int persist_environment(struct mmc *mmc, unsigned char *copies,
+			       int slot, const struct mos_boot_records *records)
+{
+	struct blk_desc *disk = mmc_get_blk_desc(mmc);
+	unsigned char *pending = copies + (1 - slot) * MOS_ENV_SIZE;
+	unsigned char *readback = copies + slot * MOS_ENV_SIZE;
+	unsigned char flag = readback[4] + 1;
+	char text[MOS_BOOT_VALUE_LIMIT + 1];
+
+	if (mos_boot_render(records, text))
+		return -1;
+	memset(pending, 0, MOS_ENV_SIZE);
+	pending[4] = flag;
+	memcpy(pending + 5, "mos_entries=", 12);
+	memcpy(pending + 17, text, strlen(text));
+	put_unaligned_le32(crc32(0, pending + 5, MOS_ENV_SIZE - 5), pending);
+	if (blk_dwrite(disk, env_blocks[1 - slot], MOS_ENV_BLOCKS, pending) != MOS_ENV_BLOCKS ||
+	    mmc_flush_cache(mmc))
+		return -1;
+	blkcache_invalidate(disk->uclass_id, disk->devnum);
+	if (blk_dread(disk, env_blocks[1 - slot], MOS_ENV_BLOCKS, readback) != MOS_ENV_BLOCKS ||
+	    memcmp(readback, pending, MOS_ENV_SIZE))
+		return -1;
+	return 0;
+}
+
+static int valid_layout(struct blk_desc *disk)
+{
+	struct disk_partition part;
+	static const unsigned long starts[] = { 64, 36864, 4231168 };
+	static const unsigned long sizes[] = { 36800, 4194304, 524288 };
+	static const char * const names[] = { "firmware", "system", "data" };
+	unsigned int i;
+
+	if (disk->blksz != 512)
+		return -1;
+	for (i = 0; i < 3; i++) {
+		if (part_get_info(disk, i + 1, &part) || part.start != starts[i] ||
+		    strcmp((char *)part.name, names[i]) ||
+		    (i == 2 ? part.size < sizes[i] : part.size != sizes[i]))
+			return -1;
+	}
+	return part_get_info(disk, 4, &part) == 0 ? -1 : 0;
+}
+
+static void __noreturn recovery(const char *reason)
+{
+	printf("MOS FIT recovery: %s\n", reason);
+	/* This constant command exposes the established local reflash transport. */
+	run_command("rockusb 0 mmc 0", 0);
+	hang();
+}
+
+void __noreturn mos_file_boot(void)
+{
+	struct mos_boot_records records;
+	struct mos_boot_record *selected;
+	struct udevice *watchdog, *button;
+	struct mmc *mmc;
+	struct blk_desc *disk;
+	unsigned char *copies;
+	char filename[96];
+	loff_t bytes, loaded;
+	int slot, next;
+
+	disable_ctrlc(1);
+	/* ENV_IS_NOWHERE prevents persistent commands from entering any init phase. */
+	if (env_set("verify", "yes"))
+		recovery("verification policy unavailable");
+	if (!button_get_by_label("recovery", &button) && button_get_state(button) == BUTTON_ON)
+		recovery("local recovery key");
+	if (uclass_get_device(UCLASS_WDT, 0, &watchdog) || wdt_start(watchdog, 120000, 0))
+		recovery("required boot watchdog unavailable");
+	mmc = find_mmc_device(0);
+	if (!mmc || mmc_init(mmc) || IS_SD(mmc) || blk_select_hwpart_devnum(UCLASS_MMC, 0, 0))
+		recovery("eMMC user area unavailable");
+	disk = mmc_get_blk_desc(mmc);
+	if (valid_layout(disk))
+		recovery("fresh three-partition layout required");
+	copies = memalign(ARCH_DMA_MINALIGN, 2 * MOS_ENV_SIZE);
+	if (!copies)
+		recovery("environment buffer unavailable");
+	memset(copies, 0, 2 * MOS_ENV_SIZE);
+	slot = read_environment(disk, copies, &records);
+	if (slot < 0)
+		recovery("redundant environment invalid");
+	next = mos_boot_next(&records);
+	if (next < 0)
+		recovery("all deployments exhausted");
+	selected = &records.entry[next];
+	if (selected->tries > 0) {
+		selected->tries--;
+		if (persist_environment(mmc, copies, slot, &records))
+			recovery("attempt persistence failed; candidate not launched");
+	}
+	memcpy(mos_deployment_id, selected->id, sizeof(mos_deployment_id));
+	snprintf(filename, sizeof(filename), "/kernels/%s/boot.itb", selected->kernel);
+	printf("MOS FIT selected: %s; tries left %d\n", mos_deployment_id, selected->tries);
+	if (!fs_set_blk_dev("mmc", "0:2", FS_TYPE_EXT) && !fs_size(filename, &bytes) &&
+	    bytes > 0 && bytes <= MOS_FIT_LIMIT &&
+	    !fs_set_blk_dev("mmc", "0:2", FS_TYPE_EXT) &&
+	    !fs_read(filename, MOS_FIT_ADDRESS, 0, bytes, &loaded) && loaded == bytes &&
+	    !fdt_check_header((void *)MOS_FIT_ADDRESS) &&
+	    fdt_totalsize((void *)MOS_FIT_ADDRESS) == bytes) {
+		wdt_reset(watchdog);
+		bootm_boot_start(MOS_FIT_ADDRESS, "ro dm_verity.require_signatures=1 panic=5 rdinit=/init");
+	}
+	if (selected->tries < 0) {
+		selected->tries = 0;
+		if (persist_environment(mmc, copies, slot, &records))
+			recovery("failed confirmed image cannot be retired");
+	}
+	free(copies);
+	puts("MOS FIT selected image failed; restarting with persisted attempts\n");
+	do_reset(NULL, 0, 0, NULL);
+	hang();
+}

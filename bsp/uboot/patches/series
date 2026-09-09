@@ -13,3 +13,4 @@
 0005-rk3576-generic-cx3576z-sd-power.patch
 0006-rk3576-generic-cx3576z-usb-host-led-boot-order.patch
 0007-rk3576-generic-cx3576z-recovery-key-saradc.patch
+0008-mos-signed-file-boot.patch

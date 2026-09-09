@@ -56,6 +56,8 @@ echo "kernel release: ${release}"
 }
 
 make "${CROSS[@]}" INSTALL_MOD_PATH=/kmods INSTALL_MOD_STRIP=1 modules_install
+# Kernel support ships runtime modules, without links into the build tree.
+rm -f "/kmods/lib/modules/${release}/build" "/kmods/lib/modules/${release}/source"
 
 # DETERMINISTIC ARCHIVE PARAMETERS, and this is a packaging fix rather than a
 # compile one -- separable from the Image above and measured separately. RFCT-343

@@ -1,36 +1,8 @@
-# Load the wireless regulatory database into cfg80211, once, after the root is
-# mounted.
-#
-# WHY THIS UNIT HAS TO EXIST, and it is not a nicety. cfg80211 is built into
-# every board kernel this tree builds and these boards have NO INITRAMFS, so
-# `regulatory_init_db()` -- a late_initcall when cfg80211 is not a module --
-# asks for `regulatory.db` while the only filesystem is still the one that does
-# not exist yet. Measured on cx3576 hardware 2026-09-08: the request ran at
-# 7.668 s and the root was mounted at 7.681 s, thirteen milliseconds later.
-#
-# AND THE FAILURE IS STICKY, which is the half that makes packaging the
-# database insufficient on its own. `regdb_fw_cb()` sets the file-scope
-# `regdb` pointer to `ERR_PTR(-ENODATA)`, and every later
-# `query_regdb_file()` returns `PTR_ERR(regdb)` without asking the firmware
-# loader again (net/wireless/reg.c). `wiphy_regulatory_register()` does not
-# re-read it either -- it re-applies the domain cfg80211 already has. The one
-# path in the whole subsystem that clears that error is `reg_reload_regdb()`,
-# reachable only through nl80211's NL80211_CMD_RELOAD_REGDB, which is what
-# `iw reg reload` sends. Without this unit the database is a file the kernel
-# will never look at again on this boot, and `country_code` in a rendered
-# hostapd or wpa_supplicant configuration cannot take effect
-# (docs/design/connd.md section 9).
-#
-# NOT `ExecStart=-`: a failure here is a real one and belongs in the health
-# gate rather than under a dash. Every way this can fail is excluded by
-# construction -- the database is a package payload on a read-only verity
-# root, `iw` is a Depends of the package that ships this unit, and nl80211 is
-# registered by a built-in cfg80211 on every board that installs it -- so a
-# non-zero exit means one of those stopped being true.
+# Built-in cfg80211 can request its database before the support mount exists.
+# Reload from the authenticated kernel support image before configuring radios.
 [Unit]
 Description=Load the wireless regulatory database into cfg80211
 Documentation=man:iw(8)
-ConditionPathExists=/lib/firmware/regulatory.db
 ConditionPathExists=/sys/module/cfg80211
 # Before anything configures a radio: mosd renders country_code into the
 # wpa_supplicant and hostapd instances it starts, and a hint issued while the
@@ -41,6 +13,8 @@ Before=network-pre.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+ExecStartPre=/usr/bin/test -s /usr/lib/firmware/regulatory.db
+ExecStartPre=/usr/bin/test -s /usr/lib/firmware/regulatory.db.p7s
 ExecStart=/usr/sbin/iw reg reload
 
 [Install]

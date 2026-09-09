@@ -1,156 +1,38 @@
 #!/usr/bin/env bash
-# mos-build-side: container -- the same builder image and the same tree
-# build.sh left behind; nothing here runs on the host.
-#
-# Reconfigure the already-built U-Boot tree with the mos A/B env and boot
-# contract of docs/design/uboot-ab-handshake.md 3.2/10, and rebuild it.
-#
-#   build-mos.sh <source-tree> <rkbin-dir> <ddr-blob> <bl31-blob>
-#
-# * redundant env pair pinned at uenv-a 0x1000000 / uenv-b 0x1100000, 64 KiB each,
-#   eMMC user area (ENV_SIZE must stay 0x10000: the Rockchip default 0x1f000 would
-#   overrun into uenv-b)
-# * ENV_MMC_USE_DT / ENV_MMC_USE_SW_PARTITION / PARTITION_TYPE_GUID stay off, or
-#   env/mmc.c relocates the env to a partition END instead of the offsets
-# * boot.scr is the only auto-discoverable entry: bootmeth order pinned to script;
-#   the rockusb rescue tail and the PREBOOT recovery key are preserved
-# * CRC32_VERIFY is on, because boot.scr checks the kernel and the dtb it just
-#   loaded against mos-boot-digest.env before booti. `load` reporting success
-#   means the FAT directory had an entry and the read did not error; a board
-#   booted a MIXTURE of two kernel builds while the console printed the full
-#   44493312 bytes read (RFCT-351/RFCT-352). CMD_CRC32 alone gives a crc32 that
-#   can only write its answer to memory, and reading it back needs a byteswap
-#   and an unpadded "%llx" -- two spellings nothing checks. `crc32 -v` compares
-#   in one command, returns the verdict as an exit status hush can branch on,
-#   and prints the two values when they differ. Losing it does not degrade the
-#   script, it BRICKS it: an unknown flag is a usage error, the script reads
-#   that as a failed verification and burns the slot.
-# * BOOTCOMMAND clears boot_targets first. A non-empty boot_targets overrides the
-#   device-tree bootdev-order, and unlike the ENV_IS_NOWHERE variant this stage's
-#   env persists in eMMC, so a value left behind by a saveenv or by hand at the
-#   U-Boot prompt would outlive the reboot and silently undo the eMMC-first order.
-#   The assertion below pins this stage's own string.
-#
-# It pairs with the mos image only -- its env offsets fall inside the alpine
-# image's boot partition.
+# mos-build-side: container -- fixed signed FIT policy and public boot anchor.
 set -euo pipefail
-
-[ "$#" -eq 4 ] || {
-    echo "usage: build-mos.sh <source-tree> <rkbin-dir> <ddr-blob> <bl31-blob>" >&2
-    exit 1
-}
+[ "$#" -eq 5 ] || { echo 'usage: build-mos.sh SOURCE RKBIN DDR BL31 PUBLIC_CERTIFICATE' >&2; exit 1; }
 SRC="$1"
-RKBIN="$2"
-DDR="${RKBIN}/bin/rk35/$3"
-BL31="${RKBIN}/bin/rk35/$4"
-
-cd "${SRC}"
-
-scripts/config --disable ENV_IS_NOWHERE \
-               --enable ENV_IS_IN_MMC \
-               --set-val ENV_OFFSET 0x1000000 \
-               --set-val ENV_SIZE 0x10000 \
-               --enable ENV_REDUNDANT \
-               --set-val ENV_OFFSET_REDUND 0x1100000 \
-               --set-val ENV_MMC_DEVICE_INDEX 0 \
-               --set-val ENV_MMC_EMMC_HW_PARTITION 0 \
-               --enable SAVEENV --enable CMD_SAVEENV \
-               --enable CMD_SETEXPR --enable CMD_SOURCE --enable CMD_IMPORTENV \
-               --enable CMD_CRC32 --enable CRC32_VERIFY \
-               --enable CMD_FS_GENERIC --enable CMD_FAT --enable CMD_BOOTI --enable CMD_PART \
-               --enable LEGACY_IMAGE_FORMAT --enable HUSH_PARSER \
-               --disable ENV_MMC_USE_DT --disable ENV_MMC_USE_SW_PARTITION \
-               --disable PARTITION_TYPE_GUID \
-               --set-str BOOTCOMMAND "setenv boot_targets; bootmeth order script; bootflow scan -lb; echo BOOT FAILED - entering rockusb; rockusb 0 mmc 0"
-
+DDR="$2/bin/rk35/$3"
+BL31="$2/bin/rk35/$4"
+CERTIFICATE="$5"
+TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SRC"
+! grep -q 'PRIVATE KEY' "$CERTIFICATE"
+scripts/config --enable MOS_FILE_BOOT --enable ENV_IS_NOWHERE \
+    --disable BOOTSTD --disable BOOTSTD_DEFAULTS --disable DISTRO_DEFAULTS \
+    --enable EFI_PARTITION --enable SUPPORT_RAW_INITRD \
+    --disable ENV_IS_IN_MMC --disable ENV_REDUNDANT --disable ENV_REDUNDANT_UPGRADE \
+    --disable SAVEENV --disable CMD_SAVEENV --disable CMD_SOURCE --disable CMD_IMPORTENV \
+    --disable CMD_BOOTI --disable LEGACY_IMAGE_FORMAT --disable USE_PREBOOT \
+    --disable USE_BOOTCOMMAND --set-val BOOTDELAY -2 \
+    --enable FIT --enable FIT_SIGNATURE --enable FIT_FULL_CHECK \
+    --enable IMAGE_SIGN_INFO --enable RSA --enable RSA_VERIFY --enable CMD_BOOTM \
+    --enable FS_EXT4 --enable WDT --enable WATCHDOG --enable DESIGNWARE_WATCHDOG \
+    --set-val WATCHDOG_TIMEOUT_MSECS 120000
 make olddefconfig
-
-# The two ENV_MMC_* values place the redundant env on the eMMC user area; if
-# olddefconfig ever drops them (v2026.07 spellings per
-# docs/design/uboot-ab-handshake.md 1.2, env/Kconfig:738,748) the env silently
-# lands on the default MMC device -- so their absence must be red. CRC32_VERIFY
-# is in the same list for the same reason and a sharper consequence: it is
-# `default n`, so it is exactly the kind of symbol an olddefconfig drops, and a
-# blob without it refuses BOTH slots on the first boot rather than misbehaving
-# quietly.
-for line in \
-    CONFIG_ENV_IS_IN_MMC=y \
-    CONFIG_ENV_OFFSET=0x1000000 \
-    CONFIG_ENV_SIZE=0x10000 \
-    CONFIG_ENV_REDUNDANT=y \
-    CONFIG_ENV_OFFSET_REDUND=0x1100000 \
-    CONFIG_ENV_MMC_DEVICE_INDEX=0 \
-    CONFIG_ENV_MMC_EMMC_HW_PARTITION=0 \
-    CONFIG_CMD_SETEXPR=y \
-    CONFIG_CMD_SAVEENV=y \
-    CONFIG_CMD_CRC32=y \
-    CONFIG_CRC32_VERIFY=y \
-    CONFIG_HUSH_PARSER=y; do
-    grep -q "^${line}$" .config || {
-        echo "ERROR: ${line} missing from mos .config" >&2
-        exit 1
-    }
+for symbol in MOS_FILE_BOOT ENV_IS_NOWHERE FIT FIT_SIGNATURE FIT_FULL_CHECK \
+    IMAGE_SIGN_INFO RSA RSA_VERIFY CMD_BOOTM FS_EXT4 WDT WATCHDOG DESIGNWARE_WATCHDOG; do
+    grep -qx "CONFIG_${symbol}=y" .config || { echo "error: missing ${symbol}" >&2; exit 1; }
 done
-
-# THE FIT SIGNATURE CAPABILITY, WHICH THIS STAGE DOES NOT ENABLE AND MUST NOT
-# LOSE. Every symbol below is already =y before this file runs: they come with
-# the Rockchip defconfig chain, because the SPL loads u-boot.itb as a FIT. That
-# is exactly why they are asserted rather than enabled -- an inherited symbol
-# has no line anywhere in this repository saying it is wanted, so a defconfig
-# that stopped selecting one would take the capability away silently and the
-# first evidence would be a board that boots an unsigned image happily.
-#
-# WHAT THEY DO AND DO NOT BUY, measured on the built blob (P1 of plan
-# 20260908-1428): with these on, u-boot-rockchip.bin carries the verification
-# code and its messages ("Failed to verify required signature '%s'"), and its
-# CONTROL FDT carries no /signature node at all -- so no key is required and a
-# FIT with no signature boots. The enforcement half is a public key written into
-# the control FDT with `required = "conf"`, and it is not here yet.
-#
-# LEGACY_IMAGE_FORMAT is in the same list for the opposite reason: it is
-# asserted PRESENT because today's boot path needs it. boot.scr is a legacy
-# uImage (build/src/tools/mkimage.ts: `mkimage -T script -C none`), so a build
-# that dropped this symbol would refuse the only entry bootflow can find. It is
-# also the unsigned path the file-based A/B design has to remove, which cannot
-# happen before boot.scr is replaced by a signed FIT.
-for line in \
-    CONFIG_FIT=y \
-    CONFIG_FIT_SIGNATURE=y \
-    CONFIG_FIT_FULL_CHECK=y \
-    CONFIG_IMAGE_SIGN_INFO=y \
-    CONFIG_RSA=y \
-    CONFIG_RSA_VERIFY=y \
-    CONFIG_SPL_FIT_SIGNATURE=y \
-    CONFIG_LEGACY_IMAGE_FORMAT=y; do
-    grep -q "^${line}$" .config || {
-        echo "ERROR: ${line} missing from mos .config" >&2
-        exit 1
-    }
+for symbol in ENV_IS_IN_MMC ENV_REDUNDANT_UPGRADE CMD_SAVEENV CMD_SOURCE CMD_BOOTI LEGACY_IMAGE_FORMAT USE_PREBOOT; do
+    if grep -qx "CONFIG_${symbol}=y" .config; then echo "error: forbidden ${symbol}" >&2; exit 1; fi
 done
-
-grep -q '^CONFIG_BOOTCOMMAND="setenv boot_targets; bootmeth order script; bootflow scan -lb; echo BOOT FAILED - entering rockusb; rockusb 0 mmc 0"' .config || {
-    echo "ERROR: this stage's own BOOTCOMMAND is not what landed in the mos .config" >&2
-    exit 1
-}
-
-for sym in CONFIG_ENV_IS_NOWHERE CONFIG_ENV_MMC_USE_DT \
-           CONFIG_ENV_MMC_USE_SW_PARTITION CONFIG_PARTITION_TYPE_GUID; do
-    if grep -q "^${sym}=y" .config; then
-        echo "ERROR: ${sym}=y would relocate the env off the pinned offsets" >&2
-        exit 1
-    fi
-done
-
-make -j"$(nproc)" CROSS_COMPILE=aarch64-linux-gnu- \
-    ROCKCHIP_TPL="${DDR}" BL31="${BL31}"
-
-# Textual check only, as in build.sh: it does not bind the mmc0 alias to the eMMC
-# controller (needs hardware; recorded no-action). This stage rebuilds
-# u-boot.dtb, so bootdev-order is re-asserted here: the one property mos
-# deliberately diverges from upstream on (eMMC first, SD as fallback) and the one
-# that ships in the mos A/B image. build.sh's LED and SD-power assertions are not
-# repeated, because this stage edits no DTS and the nodes they cover are
-# unchanged by scripts/config.
-[ "$(fdtget u-boot.dtb /bootstd bootdev-order)" = "mmc0 mmc1 usb" ]
-
-ls -la u-boot-rockchip.bin spl/u-boot-spl.bin u-boot.itb
+make -j8 CROSS_COMPILE=aarch64-linux-gnu- ROCKCHIP_TPL="$DDR" BL31="$BL31"
+bash "$TOOLS_DIR/embed-trust.sh" u-boot.dtb "$CERTIFICATE" mos-control.dtb "$SRC/tools"
+make -j8 CROSS_COMPILE=aarch64-linux-gnu- ROCKCHIP_TPL="$DDR" BL31="$BL31" EXT_DTB="$SRC/mos-control.dtb"
+cmp u-boot.dtb mos-control.dtb
+[ "$(stat -c%s u-boot-rockchip.bin)" -le 16744448 ]
+aarch64-linux-gnu-nm u-boot | grep -c ' T mos_file_boot$' >/dev/null
+cp .config mos.config
+printf '%s\n' 'MOS_SIGNED_FIT_FIRMWARE_BUILD_PASS'

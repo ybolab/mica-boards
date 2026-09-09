@@ -4,9 +4,8 @@
 #
 # Two targets:
 #   make uboot      (default artifact)      debug variant, ENV_IS_NOWHERE
-#   make uboot-mos  (--target artifact-mos) mos A/B variant: persistent redundant
-#     env + boot.scr contract (docs/design/uboot-ab-handshake.md); pairs with the
-#     mos image only — its env offsets fall inside the alpine image boot partition.
+#   make uboot-mos  (--target artifact-mos) fixed signed FIT file boot with
+#     bounded redundant counters and an explicit public boot certificate.
 #
 # ORCHESTRATION ONLY. build.sh configures and builds the debug variant, and
 # build-mos.sh reconfigures that tree for the A/B variant; both carry their own
@@ -83,13 +82,21 @@ RUN bash /bsp/uboot/build.sh /uboot /rkbin "${DDR_BLOB}" "${BL31_BLOB}" "${BOARD
 FROM build AS build-mos
 ARG DDR_BLOB=rk3576_ddr_lp4_2112MHz_lp5_2736MHz_v1.12.bin
 ARG BL31_BLOB=rk3576_bl31_v1.24.elf
-COPY build-mos.sh /bsp/uboot/build-mos.sh
-RUN bash /bsp/uboot/build-mos.sh /uboot /rkbin "${DDR_BLOB}" "${BL31_BLOB}"
+COPY build-mos.sh embed-trust.sh /bsp/uboot/
+COPY mos-file-boot.c mos-records.h /uboot/common/
+COPY --from=mos-boot-trust signer.cert.pem /mos-boot-trust.crt
+RUN bash /bsp/uboot/build-mos.sh /uboot /rkbin "${DDR_BLOB}" "${BL31_BLOB}" /mos-boot-trust.crt
 
 FROM scratch AS artifact-mos
 COPY --from=build-mos /uboot/u-boot-rockchip.bin /
 COPY --from=build-mos /uboot/spl/u-boot-spl.bin /
 COPY --from=build-mos /uboot/u-boot.itb /
+COPY --from=build-mos /uboot/u-boot.dtb /
+COPY --from=build-mos /uboot/mos.config /config
+COPY --from=build-mos /uboot/tools/mkimage /tools/mkimage
+COPY --from=build-mos /uboot/tools/fdt_add_pubkey /tools/fdt_add_pubkey
+COPY --from=build-mos /uboot/tools/fit_check_sign /tools/fit_check_sign
+COPY --from=build-mos /uboot/tools/dumpimage /tools/dumpimage
 
 FROM scratch AS artifact
 COPY --from=build /uboot/u-boot-rockchip.bin /

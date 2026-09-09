@@ -5,37 +5,7 @@ Maintainer: mos build <mos@example.invalid>
 Section: admin
 Priority: optional
 Depends: mos-system (= @VERSION@), iproute2, kmod, mawk | awk
-Description: mos board support -- CX3576-Z (Rockchip RK3576)
- Everything one cx3576 root filesystem carries that another board's does not:
- /etc/fstab, /etc/fw_env.config and /etc/rauc/system.conf rendered from
- boards/cx3576/board.env, the U-Boot environment repart definitions, the
- hardware-init programs and units with their board facts under /etc/mos, the
- status indicator, the declared AIC8800D80 firmware and the RK3576 kernel
- modules.
- .
- It also carries the board's boot inputs -- the kernel Image, the device tree,
- the U-Boot image and boot.cmd -- under /usr/lib/mos/board/cx3576. Nothing
- there is executed on the device: the image finalizer exports them from the
- installed package into the boot slots and the loader region, so which blobs
- an image was assembled from follows from its package set rather than from the
- directory the build was run beside.
- .
- /etc/mos/bt.conf ships here while hwinit-bt and mos-bt.service do not. The
- UART, the protocol and the firmware node of the Bluetooth part are facts about
- this board; the program and the unit that read them are generic and belong to
- mos-bluetooth. A board with a different radio therefore ships a different conf
- and the same application package.
- .
- There is deliberately no dependency on mos-wifi, mos-wifi-ap or mos-bluetooth.
- The cx3576 package manifest selects all three by name, and a board package
- that depended on them would take that choice away from the manifest -- a
- future board could then no longer pick client, AP and Bluetooth
- independently.
- .
- The three further dependencies are what this payload's own programs run:
- iproute2 for the ip(8) calls in hwinit-can and hwinit-mac, kmod for the
- modprobe in hwinit-gadget and hwinit-modules and for anything that loads the
- modules shipped here, and an awk for the address derivation in hwinit-mac.
- There is no ${shlibs:Depends}: the programs are shell, and the kernel modules
- are relocatable ELF whose dependencies are other modules and a kernel version
- rather than shared libraries.
+Description: mos hardware and storage policy for CX3576-Z
+ FIRMWARE/SYSTEM/DATA storage policy, board hardware initialization,
+ radio configuration and status indicators. Kernel, modules, radio firmware
+ and boot executables are separate signed components.

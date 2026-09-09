@@ -3,19 +3,23 @@
   "board": "cx3576",
   "revision": "all",
   "bootAssurance": "I1",
-  "qualification": "Verity-protected root is evidenced against the assembled image by the verify suite, A/B fallback by the host-side U-Boot sandbox handshake suite executing the shipped boot.cmd, and wrong-key/tampered-bundle refusal by the host-side negative suite. I2 waits for provisioned production trust anchors and on-board runs of both the A/B-fallback and negative suites. CONFIG_FIT_SIGNATURE is configured nowhere (docs/design/boards.md section 8), so nothing left of the verity root is verified and no claim above I1 is made.",
+  "qualification": "Current signed file deployments: required signed root/support verity, authenticated metadata and component installation. Required FIT configuration signatures and actual firmware C persistence-failure tests pass; physical cx3576 boot, power-cut, watchdog and USB flash remain pending. Development signing inputs only; conservative I1 board grade retained pending physical/operational qualification.",
   "evidenceRefs": [
     {
       "class": "verity-root",
-      "ref": "make os-verify-cx3576 (verify/run.sh --verify --board cx3576; check verity-payload-verifies)"
+      "ref": "verify/run.sh --verify --board cx3576 --image IMAGE --public-key KEY; current signed file-image checks"
     },
     {
       "class": "ab-fallback",
-      "ref": "make os-uboot-handshake-test (tests/handshake-test/)"
+      "ref": "tests/file-ab-fit/firmware-io.sh and tests/file-ab-fit/records.sh"
     },
     {
       "class": "update-negative",
-      "ref": "bash tests/rauc-trust-negative-test.sh (wrong-key / tampered-bundle refusal suite, host-side)"
+      "ref": "pkgs/mos-deploy/tests/deployments.rs and pkgs/mos-deploy/tests/acquisition.rs"
+    },
+    {
+      "class": "signature-negative",
+      "ref": "tests/file-ab-fit/signatures.sh"
     }
   ],
   "physicalBoundaries": {
