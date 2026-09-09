@@ -41,7 +41,7 @@ COPY kernel/versions.env /versions.env
 # The tag is fetched and the TREE is hashed, not a tarball: a release tarball
 # can be re-rolled and a tag can be moved, while `git archive` of the tag is a
 # deterministic byte stream over the source that is actually compiled. This is
-# pkgs/rauc/Dockerfile's discipline, reused rather than reinvented.
+# Shared pinned source-fetch discipline.
 #
 # A PENDING pin prints the hash it computed and fails, with deliberately no
 # environment variable that softens it: a pin that only warns floats for as

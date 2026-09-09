@@ -1,4 +1,0 @@
-# kernel-x64 producer context allowlist (context = the producer directory).
-# Everything this producer packs arrives as a named context: its own committed
-# files as `kerneldeb`, the BSP output as `bin` from the PREPARE hook.
-*

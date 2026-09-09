@@ -4,25 +4,7 @@ Architecture: @ARCH@
 Maintainer: mos build <mos@example.invalid>
 Section: admin
 Priority: optional
-Depends: mos-system (= @VERSION@), mos-kernel-x64 (= @VERSION@), ${shlibs:Depends}
-Description: mos board support -- x64 (QEMU/UEFI, A/B layout)
- Everything the image carries because it is the x64 board: /etc/fstab and the
- ESP mount unit rendered from boards/x64/board.env, the RAUC system
- configuration for its grub backend, and /usr/bin/grub-editenv. The ESP's own
- grub.cfg is not in here: the image assembler renders it from the repository,
- so a device copy would be an unrendered template nothing reads.
- .
- There is no vendor boot chain behind this board -- a UEFI machine's firmware
- provides it -- but the KERNEL is this repository's since PLAN-074, built by
- boards/x64/bsp and packaged as mos-kernel-x64, which this package depends on.
- It replaced Debian's linux-image-amd64 together with the entire initramfs
- apparatus: that kernel had no CONFIG_DM_INIT, so the dm-mod.create= verity
- table on the kernel command line was ignored here and an initrd had to
- re-implement it. mos-kernel-x64 carries the device mapper, dm-verity and
- squashfs built in, the board ships no initrd, and the dm-verity initramfs hook
- and local-top script this package used to install are gone with it.
- .
- initramfs-tools and cryptsetup-bin are no longer dependencies for the same
- reason. grub-editenv's libdevmapper is not named here: it is an ELF
- dependency, so ${shlibs:Depends} derives it, and with the version
- dpkg-shlibdeps reads.
+Depends: mos-system (= @VERSION@)
+Description: mos x64 three-partition storage policy
+ DATA mount and growth, read-only ESP mount and fixed SYSTEM geometry.
+ Kernel, verified support image and boot firmware are separate artifacts.

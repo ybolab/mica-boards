@@ -1,39 +1,9 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: mos
-Comment: The copyright file of mos-board-x64, installed as
- /usr/share/doc/mos-board-x64/copyright. This board's own file rather than the
- shared rootfs/packages-src/copyright, because the payload is not all this
- repository's: /usr/bin/grub-editenv is Debian's binary, taken out of the
- grub-common package, and rootfs/packages-src/README.md requires a producer
- shipping vendor content to record that content's own licence instead.
- .
- THIS FILE IS INCOMPLETE ON ITS OWN, deliberately. The GPL-3.0-or-later stanza
- at the end has no body here: boards/x64/deb/board-x64/Dockerfile harvests
- /usr/share/doc/grub-common/copyright out of the very archive grub-editenv was
- extracted from and appends it there, indented one space with blank lines
- written as `.`, which is how this format carries verbatim text. Hand-writing
- that record would make it a claim about the binary; harvesting it makes it the
- binary's own.
- .
- The Apache-2.0 text below is carried HERE rather than referenced, for the
- reason the shared file gives: the mos image ships no /usr/share/common-licenses
- directory, so a reference to it would dangle on the device. The harvested
- grub-common record does point there, being Debian's own file quoted verbatim;
- that is a fact about the record and is left as it stands rather than edited.
 
 Files: *
 Copyright: The mos project
 License: Apache-2.0
-
-Files: usr/bin/grub-editenv
-Copyright: 1999-2009 Free Software Foundation, Inc.
-License: GPL-3.0-or-later
-Comment: One file out of Debian's grub-common, not a build of the GRUB sources.
- RAUC's grub backend execs it to read and write grubenv; the rest of that
- package is a 20 MB installed increment a device that only rewrites a grubenv
- has no use for. Shipping the binary inside this archive is what makes the
- obligation recordable at all -- a loose copy installed by a build script is
- the same GPL-3 binary with nothing saying so.
 
 License: Apache-2.0
  Licensed under the Apache License, Version 2.0 (the "License");
@@ -251,5 +221,3 @@ License: Apache-2.0
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
-
-License: GPL-3.0-or-later

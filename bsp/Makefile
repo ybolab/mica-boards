@@ -39,7 +39,7 @@ UBUNTU_ARG := MOS_IMAGE_UBUNTU_2404=IMAGE_UBUNTU_2404
 # Distribute the same public certificate bundle to every builder. Kernel builds
 # never mint keys; development material is generated explicitly before building.
 VERITY_TRUST_CERT ?= ../../../meta/verity/signer.cert.pem
-VERITY_TOOL := ../../../pkgs/rauc/verity-tool.sh
+VERITY_TOOL := ../../../pkgs/mos-boot/verity-tool.sh
 
 all: kernel
 
