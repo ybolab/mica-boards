@@ -19,7 +19,7 @@ BSP_OUT ?= ../../../_out/boards/cx3576
 
 # The complete factory image is assembled from independently signed components.
 MOS_OUT ?= ../../../_out/cx3576/image
-MOS_IMAGE ?= $(MOS_OUT)/disk.img
+MOS_IMAGE ?= $(lastword $(sort $(wildcard $(MOS_OUT)/mos-cx3576-*.img)))
 
 TOOLS_DIR ?= tools
 THIRD_DIR ?= third
@@ -97,12 +97,14 @@ source-check:
 
 # Full-system installation only. The board remains in Loader mode on any failure.
 flash-mos:
+	@test -n "$(MOS_IMAGE)" || { echo 'error: no timestamped cx3576 image found; set MOS_IMAGE explicitly' >&2; exit 1; }
 	bash scripts/verify-flash.sh --check "$(MOS_IMAGE)"
 	$(RKDEVELOPTOOL) wl 0 "$(MOS_IMAGE)"
 	RKDEVELOPTOOL='$(RKDEVELOPTOOL)' bash scripts/verify-flash.sh "$(MOS_IMAGE)"
 	$(RKDEVELOPTOOL) rd
 
 flash-maskrom:
+	@test -n "$(MOS_IMAGE)" || { echo 'error: no timestamped cx3576 image found; set MOS_IMAGE explicitly' >&2; exit 1; }
 	bash scripts/verify-flash.sh --check "$(MOS_IMAGE)"
 	$(SHA256) -c uboot/MiniLoaderAll.bin.sha256
 	$(RKDEVELOPTOOL) db $(VENDOR_MINILOADER)
