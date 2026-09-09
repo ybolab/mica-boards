@@ -19,8 +19,7 @@ RUN set -eu; \
 FROM packer AS package-base
 
 COPY . /package
-RUN /package/test-manifest.sh /package bootloader \
-    && /package/test-manifest.sh /package emmc
+RUN /package/test-manifest.sh /package
 
 WORKDIR /work
 COPY config/aml_sdc_burn.ini /work/aml_sdc_burn.ini
@@ -32,30 +31,11 @@ COPY --from=uboot-artifacts DDR.USB /work/DDR.USB
 COPY --from=uboot-artifacts u-boot.bin.signed /work/bootloader.PARTITION
 COPY --from=uboot-artifacts u-boot.bin.sd.bin.signed /work/aml_sdc_burn.UBOOT
 
-FROM package-base AS emmc-package
-
-COPY config/emmc.cfg /work/image.cfg
-COPY --from=emmc-payloads gpt.bin /work/gpt.bin
-COPY --from=emmc-payloads uenv-a.PARTITION uenv-b.PARTITION /work/
-COPY --from=emmc-payloads boot-a.PARTITION boot-b.PARTITION /work/
-COPY --from=emmc-payloads rootfs-a.PARTITION rootfs-b.PARTITION /work/
-COPY --from=emmc-payloads meta.PARTITION state.PARTITION /work/
-COPY --from=emmc-payloads ephemeral.PARTITION data.PARTITION /work/
-RUN /package/pack-and-verify.sh emmc /work /output
-
-FROM scratch AS emmc-artifact
-COPY --from=emmc-package /output/update.img /
-
 FROM package-base AS bootloader-package
 
 COPY config/bootloader.cfg /work/image.cfg
-RUN /package/pack-and-verify.sh bootloader /work /output
+RUN /package/pack-and-verify.sh /work /output
 
-# Keep the historical Dockerfile default as the bootloader-only RFCT-928
-# artifact. Complete-package callers select emmc-artifact explicitly.
 FROM scratch AS bootloader-artifact
 COPY --from=bootloader-package /output/update.img /
 COPY --from=bootloader-package /work/aml_sdc_burn.ini /
-
-# Backward-compatible target name used by RFCT-928 callers.
-FROM bootloader-artifact AS artifact

@@ -1,9 +1,0 @@
-Package: mos-s905x5m-radio
-Version: @VERSION@
-Architecture: @ARCH@
-Maintainer: mos build <mos@example.invalid>
-Section: admin
-Priority: optional
-Depends: mos-board-s905x5m (= @VERSION@), kmod
-Description: Seekwave combo-radio initialization for S905X5M
- Powers and initializes the shared SDIO transport used by Wi-Fi and Bluetooth.
