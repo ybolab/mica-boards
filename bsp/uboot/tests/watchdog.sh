@@ -22,9 +22,16 @@ if match:
 else:
  adapter='static int (*rk3576_enable)(struct clk *) = NULL;\n'
 (out/'clock-enable.h').write_text(adapter)
+rockusb=(source/'cmd/rockusb.c').read_text()
+start=rockusb.index('\twhile (1) {')
+end=rockusb.index('\n\t}', start)+3
+(out/'recovery-loop.h').write_text(rockusb[start:end]+'\n')
 (out/'watchdog-driver.h').write_text(f'#include "{source}/drivers/watchdog/designware_wdt.c"\n')
 PY
 gcc -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter -fsanitize=address,undefined \
     -I"$work/include" -I"$work" -I"$source_dir/dts/upstream/include" \
     "$tests_dir/watchdog.c" -o "$work/watchdog"
 "$work/watchdog"
+gcc -std=gnu11 -Wall -Wextra -Werror -fsanitize=address,undefined \
+    -I"$work" "$tests_dir/rockusb-watchdog.c" -o "$work/rockusb-watchdog"
+"$work/rockusb-watchdog"
