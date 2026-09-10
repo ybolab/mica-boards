@@ -5,7 +5,6 @@
 
 #include "rk3576.dtsi"
 #include "rk3576-evb1.dtsi"
-#include "rk3576-evb1-cam-dcphy0.dtsi"
 #include "rk3576-linux.dtsi"
 
 / {
@@ -251,10 +250,6 @@
 	status = "disabled";
 };
 
-&{/i2c@2ac70000/imx415@1a} {
-	status = "disabled";
-};
-
 &{/pwm@2ade5000} { status = "okay"; };
 &{/watchdog@2ace0000} { status = "okay"; };
 
@@ -311,10 +306,6 @@
 &{/dp0-sound} { status = "disabled"; };
 &{/i2c@27300000} { status = "disabled"; };
 &{/i2c@27300000/gt1x@14} { status = "disabled"; };
-&{/i2c@2ac70000/imx464-0@1a} { status = "disabled"; };
-&{/i2c@2ac70000/imx464-1@36} { status = "disabled"; };
-&{/i2c@2ac70000/os04a10@36} { status = "disabled"; };
-&{/i2c@2ac70000/sc4336@30} { status = "disabled"; };
 &{/i2c@2aca0000/icm_acc@68} { status = "disabled"; };
 &{/i2c@2aca0000/icm_gyro@68} { status = "disabled"; };
 
@@ -435,4 +426,40 @@
 		output-high;
 		line-name = "modem-pwren";
 	};
+};
+
+/* No CSI sensors or DSI panel are connected on this board. */
+&mipidcphy0 { status = "disabled"; };
+&csi2_dphy0_hw { status = "disabled"; };
+&csi2_dphy1_hw { status = "disabled"; };
+&mipi0_csi2_hw { status = "disabled"; };
+&mipi1_csi2_hw { status = "disabled"; };
+&mipi2_csi2_hw { status = "disabled"; };
+&mipi3_csi2_hw { status = "disabled"; };
+&mipi4_csi2_hw { status = "disabled"; };
+&vcc_mipicsi1 { status = "disabled"; };
+&vcc_mipidcphy0 { status = "disabled"; };
+
+/* BL31 provides SCMI over SMC, without an OP-TEE payload. */
+&optee { status = "disabled"; };
+
+/* Signed FIT boot uses the Linux logo, without a vendor loader framebuffer. */
+&{/reserved-memory} {
+	/delete-node/ drm-logo@0;
+	/delete-node/ drm-cubic-lut@0;
+};
+&display_subsystem {
+	/delete-property/ memory-region;
+	/delete-property/ memory-region-names;
+};
+&route_hdmi {
+	/delete-property/ logo,uboot;
+	/delete-property/ logo,kernel;
+	/delete-property/ logo,mode;
+	/delete-property/ charge_logo,mode;
+};
+
+/* Match the Bifrost driver's primary lookup without changing IRQ ordering. */
+&gpu {
+	interrupt-names = "GPU", "MMU", "JOB";
 };

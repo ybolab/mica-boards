@@ -103,6 +103,9 @@ ARG KERNEL_EXPECT=6.1.115
 COPY kernel/build.sh /bsp/kernel/build.sh
 RUN bash /bsp/kernel/build.sh /ksrc "${KERNEL_EXPECT}"
 
+COPY kernel/export-regdb-certs.py /bsp/kernel/export-regdb-certs.py
+RUN python3 /bsp/kernel/export-regdb-certs.py /ksrc /regdb-certs.pem
+
 # THE RESOLVED CONFIG IS AN ARTIFACT, as it already is on x64 and virt-arm64:
 # what olddefconfig decided over the board config merged with the common
 # fragment, and the only form of the `=y` floor the image contract can read back
@@ -137,3 +140,4 @@ COPY --from=build /ksrc/System.map /
 COPY --from=build /kernel.release /
 COPY --from=build /modules.tar /
 COPY --from=build /rk3576-src.dtb /
+COPY --from=build /regdb-certs.pem /

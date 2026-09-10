@@ -1,7 +1,7 @@
 [Unit]
 Description=Bluetooth pairing keys from DATA state
 # bluez stores link keys and paired-device records under /var/lib/bluetooth.
-# Pairing credentials live in DATA state under the immutable /var skeleton.
+# Pairing credentials remain outside the bounded general var project.
 Requires=mos-seed-state.service
 After=mos-seed-state.service
 RequiresMountsFor=/mnt/data/state

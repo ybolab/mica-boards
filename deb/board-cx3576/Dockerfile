@@ -39,6 +39,8 @@ RUN set -eu; \
         done; \
     done; \
     \
+    install -D -m 0644 /in/board-overlay/etc/systemd/logind.conf.d/50-mos-console.conf "${ROOT}/etc/systemd/logind.conf.d/50-mos-console.conf"; \
+    \
     # PRESETS, taken as a set for the same reason as the drop-ins above. This \
     # board ships 50-mos-getty.preset, which resolves getty@tty1 to disabled so \
     # HDMI shows PLAN-088's boot logo instead of a login prompt; mos-system \

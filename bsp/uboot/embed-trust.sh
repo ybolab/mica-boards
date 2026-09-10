@@ -12,7 +12,7 @@ count=$(grep -c -- '-----BEGIN CERTIFICATE-----' "$bundle")
 work=$(mktemp -d "$(dirname "$output")/.fit-trust.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 cp "$control" "$work/control.dtb"
-if fdtget -l "$work/control.dtb" / | grep -qx signature; then fdtput -r "$work/control.dtb" /signature; fi
+if fdtget -l "$work/control.dtb" / | grep -cx signature >/dev/null; then fdtput -r "$work/control.dtb" /signature; fi
 awk -v directory="$work" '
     /-----BEGIN CERTIFICATE-----/ { n++; path=sprintf("%s/input-%d.pem", directory, n) }
     path { print >path }

@@ -73,6 +73,9 @@ scripts/config --disable LOCALVERSION_AUTO \
                --enable RTC_DRV_HYM8563 \
                --enable LEDS_TRIGGERS \
                --enable LEDS_TRIGGER_HEARTBEAT \
+               --disable MALI400 --disable TEE --disable OPTEE \
+               --disable ARM_SCMI_TRANSPORT_OPTEE --disable HW_RANDOM_OPTEE \
+               --enable AUTOFS_FS \
                --enable LOGO \
                --enable LOGO_LINUX_CLUT224 \
                --disable LOGO_LINUX_MONO \
@@ -204,3 +207,10 @@ done
     exit 1
 }
 echo "config: all ${n} mos-required options are set"
+
+require '^CONFIG_AUTOFS_FS=y'
+require '^CONFIG_ARM_SCMI_TRANSPORT_SMC=y'
+require '^CONFIG_MALI_BIFROST=y'
+for option in MALI400 TEE OPTEE ARM_SCMI_TRANSPORT_OPTEE HW_RANDOM_OPTEE; do
+    refuse "^CONFIG_${option}=[ym]"
+done
