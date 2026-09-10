@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MOS_BOOT_RECORD_LIMIT 3
+#define MOS_BOOT_RECORD_LIMIT 2
 #define MOS_BOOT_VALUE_LIMIT 512
 #define MOS_BOOT_GENERATION_LIMIT 9007199254740991ULL
 
