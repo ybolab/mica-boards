@@ -15,7 +15,7 @@ command -v "$rk" >/dev/null
 scratch=$(mktemp "$(dirname "$image")/.verify-flash.XXXXXX")
 trap 'echo "Readback retained at $scratch" >&2' ERR
 head_sectors=36864
-sectors=$((2323 * 2048))
+sectors=$((1299 * 2048))
 "$rk" rl 0 "$head_sectors" "$scratch"
 python3 "$here/verify-flash.py" compare "$image" "$scratch" 0 "$((head_sectors * 512))"
 "$rk" rl "$head_sectors" "$((sectors - head_sectors))" "$scratch"

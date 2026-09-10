@@ -94,8 +94,8 @@ static int persist_environment(struct mmc *mmc, unsigned char *copies,
 static int valid_layout(struct blk_desc *disk)
 {
 	struct disk_partition part;
-	static const unsigned long starts[] = { 64, 36864, 4231168 };
-	static const unsigned long sizes[] = { 36800, 4194304, 524288 };
+	static const unsigned long starts[] = { 64, 36864, 2134016 };
+	static const unsigned long sizes[] = { 36800, 2097152, 524288 };
 	static const char * const names[] = { "firmware", "system", "data" };
 	unsigned int i;
 

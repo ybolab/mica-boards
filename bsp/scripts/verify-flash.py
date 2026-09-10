@@ -8,7 +8,7 @@ import zlib
 
 def check_image(path):
     size = path.stat().st_size
-    assert size == 2323 * 1048576, "wrong factory image size"
+    assert size == 1299 * 1048576, "wrong factory image size"
     last = size // 512 - 1
     with path.open("rb") as image:
         def header(lba, backup, table_lba):
@@ -28,7 +28,7 @@ def check_image(path):
         table = header(1, last, 2)
         assert header(last, 1, last - 32) == table, "backup GPT differs"
         entries = [table[n:n + 128] for n in range(0, len(table), 128) if any(table[n:n + 16])]
-        expected = [("firmware", 64, 36863), ("system", 36864, 4231167), ("data", 4231168, 4755455)]
+        expected = [("firmware", 64, 36863), ("system", 36864, 2134015), ("data", 2134016, 2658303)]
         assert len(entries) == 3, "factory image must have three partitions"
         for entry, (name, start, end) in zip(entries, expected):
             assert struct.unpack_from("<QQ", entry, 32) == (start, end), f"wrong {name} partition range"
