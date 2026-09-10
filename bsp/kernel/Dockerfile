@@ -64,8 +64,8 @@ COPY kernel/patches/ /patches/
 # before anything in the tree has been touched; set -e stops on the first one.
 RUN set -eu; \
     count="$(find /patches -maxdepth 1 -type f -name '*.patch' | wc -l)"; \
-    [ "${count}" -eq 13 ] || { \
-        echo "ERROR: expected 13 kernel patches, found ${count}" >&2; \
+    [ "${count}" -eq 14 ] || { \
+        echo "ERROR: expected 14 kernel patches, found ${count}" >&2; \
         exit 1; \
     }; \
     cd /ksrc; \
@@ -78,10 +78,14 @@ RUN set -eu; \
 COPY kernel/config/kernel-s905x5m.config /ksrc/.config
 COPY kernel/config/runtime.fragment /runtime.fragment
 COPY kernel/config/wireless.fragment /wireless.fragment
+COPY kernel/config/signed-boot.fragment /signed-boot.fragment
+COPY --from=mos-trust signer.cert.pem /ksrc/certs/mos-verity-anchor.pem
 COPY kernel/dts/s7d_s905x5m_m100.dts /ksrc/common_drivers/arch/arm64/boot/dts/amlogic/
 # Shared mos runtime baseline from boards/common/. The named context is
 # wired by the BSP Makefile; a bare build without it fails at this COPY.
 COPY --from=mos-common mos-required.fragment /mos-required.fragment
+
+ENV KBUILD_BUILD_TIMESTAMP="@1577836800" KBUILD_BUILD_USER=mos KBUILD_BUILD_HOST=mos-build SOURCE_DATE_EPOCH=1577836800
 
 ARG KERNEL_EXPECT=6.12.38-m100-arm64
 # The first fixed-string lookup is a positive control against the final
@@ -94,8 +98,11 @@ RUN set -eu; \
                    --disable IKHEADERS; \
     ARCH=arm64 CROSS_COMPILE="$CROSS_COMPILE" \
         scripts/kconfig/merge_config.sh -m .config \
-            /runtime.fragment /wireless.fragment /mos-required.fragment; \
+            /runtime.fragment /wireless.fragment /mos-required.fragment /signed-boot.fragment; \
     make ARCH=arm64 CROSS_COMPILE="$CROSS_COMPILE" olddefconfig; \
+    test -s certs/mos-verity-anchor.pem; \
+    grep -Fqx 'CONFIG_SYSTEM_TRUSTED_KEYS="certs/mos-verity-anchor.pem"' .config; \
+    grep -Fxf /signed-boot.fragment .config | grep -q '^CONFIG_CMDLINE='; \
     test -s .config; \
     grep -Fqx -- 'CONFIG_ARM64=y' .config || { \
         echo 'final .config grep control did not find CONFIG_ARM64=y' >&2; \
@@ -127,7 +134,7 @@ RUN set -eu; \
         exit 1; \
     }; \
     for line in $(sed -n 's/^\(CONFIG_[A-Z0-9_]*=[ym]\)$/\1/p' \
-                      /runtime.fragment /wireless.fragment); do \
+                      /runtime.fragment /wireless.fragment /signed-boot.fragment); do \
         grep -Fqx -- "${line}" .config || { \
             echo "missing board-required option: ${line}" >&2; \
             exit 1; \
@@ -161,7 +168,9 @@ RUN set -eu; \
     cp common_drivers/arch/arm64/boot/dts/amlogic/s7d_s905x5m_m100.dtb \
         /s7d_s905x5m_m100.dtb; \
     compatible="$(fdtget /s7d_s905x5m_m100.dtb / compatible)"; \
-    [ "${compatible}" = 's7d_s905x5m_bm201' ]
+    [ "${compatible}" = 's7d_s905x5m_bm201' ]; \
+    [ "$(fdtget -t u /s7d_s905x5m_m100.dtb /soc/apb4@fe000000/watchdog@2100 amlogic,feed_watchdog_mode)" = 0 ]; \
+    [ "$(fdtget -t u /s7d_s905x5m_m100.dtb /soc/apb4@fe000000/watchdog@2100 timeout-sec)" = 60 ]
 
 # The vendor Android 5.15 tree carries an HT1628 driver for this exact panel,
 # but it uses obsolete integer GPIO and character-device APIs.  Build the
@@ -241,6 +250,9 @@ RUN set -eu; \
     done; \
     tar -C /kmods -cf /modules.tar lib
 
+COPY --from=mos-common export-regdb-certs.py /export-regdb-certs.py
+RUN python3 /export-regdb-certs.py /ksrc /regdb-certs.pem
+
 FROM scratch AS artifact
 COPY --from=build /ksrc/arch/arm64/boot/Image /
 COPY --from=build /modules.tar /
@@ -248,3 +260,4 @@ COPY --from=build /s7d_s905x5m_m100.dtb /
 COPY --from=build /ksrc/.config /config
 COPY --from=build /ksrc/include/config/kernel.release /kernel.release
 COPY --from=build /ksrc/System.map /System.map
+COPY --from=build /regdb-certs.pem /

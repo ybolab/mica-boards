@@ -1,4 +1,4 @@
-.PHONY: kernel uboot uboot-package uboot-package-test userland
+.PHONY: kernel uboot fit-tools uboot-package uboot-package-test userland
 
 BSP_OUT ?= ../../../_out/boards/s905x5m
 FROM_SH := ../../../build-env/from.sh
@@ -9,9 +9,15 @@ UBOOT_ARTIFACTS := $(BSP_OUT)/uboot/u-boot.bin.signed \
 	$(BSP_OUT)/uboot/DDR.USB
 UBOOT_PACKAGE_DIR := $(BSP_OUT)/uboot-package
 
+VERITY_TRUST_CERT ?= ../../../meta/verity/signer.cert.pem
+FIT_TRUST_CERT ?=
+VERITY_TOOL := ../../../pkgs/mos-boot/verity-tool.sh
+
 kernel:
+	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(VERITY_TRUST_CERT)" "$(BSP_OUT)/verity-trust")" && \
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
-	docker buildx build --build-context mos-common=../../common -f kernel/Dockerfile $$IMG \
+	docker buildx build --label ai-agent=true -t ai-agent/mos-s905x5m-kernel \
+	  --build-context mos-common=../../common --build-context "mos-trust=$$TRUST_DIR" -f kernel/Dockerfile $$IMG \
 	  $(if $(KERNEL_REPO),--build-arg KERNEL_REPO=$(KERNEL_REPO)) \
 	  $(if $(KERNEL_COMMIT),--build-arg KERNEL_COMMIT=$(KERNEL_COMMIT)) \
 	  $(if $(KERNEL_EXPECT),--build-arg KERNEL_EXPECT=$(KERNEL_EXPECT)) \
@@ -19,18 +25,27 @@ kernel:
 
 userland:
 	IMG="$$(bash $(FROM_SH) $(DEBIAN_ARG))" && \
-	docker buildx build --platform linux/arm64 --target artifact \
+	docker buildx build --label ai-agent=true -t ai-agent/mos-s905x5m-userland --platform linux/arm64 --target artifact \
 	  -f userland/Dockerfile $$IMG -o $(BSP_OUT)/userland userland
 
-# The default U-Boot artifact stage includes the section 5 contract gate. It
-# exports only when board-owned requirements pass; the separately tracked FIT
-# signing debt remains a loud warning rather than a silent acceptance claim.
+# Only public FIT trust enters the firmware builder.
 uboot:
+	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(FIT_TRUST_CERT)" "$(BSP_OUT)/fit-trust")" && \
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
-	docker buildx build -f uboot/Dockerfile $$IMG \
+	docker buildx build --label ai-agent=true -t ai-agent/mos-s905x5m-uboot \
+	  --build-context mos-common=../../common --build-context "mos-boot-trust=$$TRUST_DIR" \
+	  -f uboot/Dockerfile $$IMG \
 	  $(if $(UBOOT_REPO),--build-arg UBOOT_REPO=$(UBOOT_REPO)) \
 	  $(if $(UBOOT_COMMIT),--build-arg UBOOT_COMMIT=$(UBOOT_COMMIT)) \
 	  -o $(BSP_OUT)/uboot uboot
+
+fit-tools:
+	@test -x "$(BSP_OUT)/uboot/tools/fit_check_sign"
+	$(MAKE) -C ../../.. os-boot-tools
+	docker build --label ai-agent=true -t ai-agent/mos-fit-tools-amd64 \
+	  --build-arg MOS_BOOT_TOOLS=ai-agent/mos-boot-tools-amd64 \
+	  --build-context fit-tools=$(BSP_OUT)/uboot/tools \
+	  -f ../../../pkgs/mos-boot/Dockerfile.fit ../../../pkgs/mos-boot
 
 # Packaging is a separate consumer of the section-3 U-Boot artifact interface.
 # It deliberately does not rebuild U-Boot: first produce the three artifacts
@@ -51,7 +66,7 @@ uboot-package: uboot-package-test
 	tmp_output="$$(mktemp -d $(BSP_OUT)/.uboot-package.XXXXXX)"; \
 	trap 'rm -rf "$$tmp_output"' 0 1 2 3 15; \
 	IMG="$$(bash $(FROM_SH) $(DEBIAN_ARG))"; \
-	docker buildx build --platform linux/386 --target bootloader-artifact \
+	docker buildx build --label ai-agent=true -t ai-agent/mos-s905x5m-recovery --platform linux/386 --target bootloader-artifact \
 		--build-context uboot-artifacts=$(BSP_OUT)/uboot \
 		-f uboot/package/Dockerfile $$IMG \
 		-o "$$tmp_output" uboot/package; \

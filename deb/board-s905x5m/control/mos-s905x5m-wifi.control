@@ -1,0 +1,8 @@
+Package: mos-s905x5m-wifi
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: mos build <mos@example.invalid>
+Section: admin
+Priority: optional
+Depends: mos-s905x5m-wireless (= @VERSION@), mos-wifi (= @VERSION@)
+Description: Seekwave Wi-Fi station selection

@@ -10,7 +10,13 @@ conf_get() { sed -n "s/^$1=//p" "$CONF" | head -n1; }
 power=$(conf_get power-control)
 platform=$(conf_get platform-module)
 modules=$(conf_get transport-modules)
+wifi=0
+bluetooth=0
+[ ! -r "${CONF%/*}/wifi.conf" ] || wifi=1
+[ ! -r "${CONF%/*}/bluetooth.conf" ] || bluetooth=1
+[ "$wifi$bluetooth" != 00 ] || exit 0
 interface=$(conf_get interface)
+wifi_module=$(conf_get wifi-module)
 bt_transport=$(conf_get bt-transport)
 vhci=$(conf_get vhci)
 limit=$(conf_get wait-seconds)
@@ -27,10 +33,17 @@ modprobe -q "$platform"
 }
 printf '1\n' > "$power"
 for module in $modules; do modprobe -q "$module"; done
+[ "$wifi" = 0 ] || modprobe -q "$wifi_module"
+[ "$bluetooth" = 0 ] || modprobe -q hci_vhci
 
 ready() {
-    [ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] &&
-        [ -c "$bt_transport" ] && [ -c "$vhci" ]
+    if [ "$wifi" = 1 ]; then
+        [ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] || return 1
+    fi
+    if [ "$bluetooth" = 1 ]; then
+        [ -c "$bt_transport" ] && [ -c "$vhci" ] || return 1
+    fi
+    return 0
 }
 waited=0
 while ! ready && [ "$waited" -lt "$limit" ]; do
@@ -38,6 +51,6 @@ while ! ready && [ "$waited" -lt "$limit" ]; do
     waited=$((waited + 1))
 done
 ready || {
-    echo "wireless: $interface, $bt_transport and $vhci were not all ready within ${limit}s" >&2
+    echo "wireless: selected radio endpoints were not ready within ${limit}s" >&2
     exit 1
 }

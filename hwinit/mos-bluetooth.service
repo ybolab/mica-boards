@@ -1,7 +1,7 @@
 [Unit]
 Description=Bridge the Seekwave Bluetooth controller into Linux vHCI
 ConditionPathExists=/etc/mos/bluetooth.conf
-Wants=mos-wireless.service
+Requires=mos-wireless.service
 After=mos-wireless.service var-lib-bluetooth.mount
 Before=bluetooth.service
 RequiresMountsFor=/var/lib/bluetooth

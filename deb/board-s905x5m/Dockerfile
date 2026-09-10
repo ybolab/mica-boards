@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+# check=skip=InvalidDefaultArgInFrom
+ARG MOS_BUILD_DEB
+FROM ${MOS_BUILD_DEB} AS pack
+COPY --from=packer pack.sh /usr/local/bin/pack.sh
+COPY --from=family copyright /in/copyright
+COPY --from=board board.env /src/boards/s905x5m/board.env
+COPY --from=board hwinit/ /in/hwinit/
+COPY --from=board bsp/init/ /in/init/
+COPY --from=board components/bm201-front-panel/dist/ /in/front-panel/
+COPY --from=overlay etc/fstab.in /src/rootfs/overlay/etc/fstab.in
+COPY render.sh stage.sh /in/
+COPY control/ /in/control/
+ARG MOS_DEB_VERSION
+ARG MOS_DEB_ARCH
+ARG SOURCE_DATE_EPOCH
+RUN bash /in/stage.sh
+FROM scratch AS out
+COPY --from=pack /out/ /
