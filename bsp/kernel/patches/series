@@ -10,3 +10,4 @@
 0003-mali-deterministic-build-date.patch
 0004-arm64-dts-rockchip-register-cx3576z-dtb.patch
 0005-mpp-rkvenc2-rk3576-fixed-rate-opp.patch
+0006-fbcon-retain-and-restore-board-logo.patch

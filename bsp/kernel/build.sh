@@ -37,6 +37,7 @@ make "${CROSS[@]}" -j"$(nproc)" Image modules
 #   0003  the Mali BUILD_DATE made deterministic
 #   0004  the cx3576z dtb registered in the rockchip dts Makefile
 #   0005  the RK3576 encoder fixed-rate OPP path
+#   0006  retained artwork and idle-console redraw on VT/HPD events
 grep -qF 'module_param(yt8531_stock_init, bool, 0444);' drivers/net/phy/motorcomm.c
 grep -qF 'obj-$(CONFIG_AIC_WLAN_SUPPORT) += aic8800_sdio/' drivers/net/wireless/Makefile
 grep -qF 'BUILD_DATE=$(shell date -u -d' drivers/gpu/arm/mali400/mali/Kbuild
@@ -45,6 +46,19 @@ grep -qF 'dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3576-cx3576z.dtb' \
 grep -qF 'using fixed clock rates, devfreq is disabled' \
     drivers/video/rockchip/mpp/mpp_rkvenc2.c
 grep -q '^CONFIG_LEDS_TRIGGER_HEARTBEAT=y' include/config/auto.conf
+grep -qF 'fbcon_show_idle_logo(vc, info)' drivers/video/fbdev/core/fbcon.c
+grep -qF 'fbcon_update_vcs(info, true);' drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+
+# A late fbdev/VT redraw must not follow a pointer into discarded init memory.
+# Check all three artwork symbols, not just the public descriptor.
+logo_symbols="$(aarch64-linux-gnu-objdump -t drivers/video/logo/logo_linux_clut224.o)"
+for symbol in logo_linux_clut224 logo_linux_clut224_data logo_linux_clut224_clut; do
+    awk -v symbol="${symbol}" '
+        $NF == symbol && $4 ~ /^\.rodata($|\.)/ { found = 1; print }
+        END { exit !found }
+    ' <<<"${logo_symbols}"
+done
+unset logo_symbols
 
 # The link-time symbol table and the object it came from, sized in the log
 # because kernel/Dockerfile's artifact stage takes one and leaves the other and
