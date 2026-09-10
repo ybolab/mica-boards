@@ -36,11 +36,14 @@ make "${CROSS[@]}" -j"$(nproc)" Image modules
 #   0002  the AIC_WLAN_SUPPORT gate on the aic8800_sdio directory
 #   0003  the Mali BUILD_DATE made deterministic
 #   0004  the cx3576z dtb registered in the rockchip dts Makefile
+#   0005  the RK3576 encoder fixed-rate OPP path
 grep -qF 'module_param(yt8531_stock_init, bool, 0444);' drivers/net/phy/motorcomm.c
 grep -qF 'obj-$(CONFIG_AIC_WLAN_SUPPORT) += aic8800_sdio/' drivers/net/wireless/Makefile
 grep -qF 'BUILD_DATE=$(shell date -u -d' drivers/gpu/arm/mali400/mali/Kbuild
 grep -qF 'dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3576-cx3576z.dtb' \
     arch/arm64/boot/dts/rockchip/Makefile
+grep -qF 'using fixed clock rates, devfreq is disabled' \
+    drivers/video/rockchip/mpp/mpp_rkvenc2.c
 grep -q '^CONFIG_LEDS_TRIGGER_HEARTBEAT=y' include/config/auto.conf
 
 # The link-time symbol table and the object it came from, sized in the log
