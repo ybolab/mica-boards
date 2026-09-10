@@ -56,7 +56,7 @@ ALPINE_ARG := MOS_IMAGE_ALPINE_3_24_1=IMAGE_ALPINE_3_24_1
 
 all: kernel uboot-mos
 
-# `--build-context bsp-scripts=scripts` is what lets the U-Boot target keep
+# `--build-context bsp-scripts=scripts --build-context mos-common=../../common` is what lets the U-Boot target keep
 # `uboot` as its build context while still reading boards/cx3576/bsp/scripts/.
 # The kernel target's context is the board directory and reaches them with a
 # plain COPY; widening this one to match would put the committed Wi-Fi firmware
@@ -66,7 +66,7 @@ uboot-mos:
 	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(FIT_TRUST_CERT)" "$(BSP_OUT)/fit-trust")" && \
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
 	docker buildx build --label ai-agent=true -t ai-agent/mos-cx-uboot \
-	  --build-context bsp-scripts=scripts --build-context "mos-boot-trust=$$TRUST_DIR" \
+	  --build-context bsp-scripts=scripts --build-context mos-common=../../common --build-context "mos-boot-trust=$$TRUST_DIR" \
 	  -f uboot/Dockerfile --target artifact-mos $$IMG \
 	  $(if $(UBOOT_COMMIT),--build-arg UBOOT_COMMIT=$(UBOOT_COMMIT)) \
 	  $(if $(RKBIN_COMMIT),--build-arg RKBIN_COMMIT=$(RKBIN_COMMIT)) \

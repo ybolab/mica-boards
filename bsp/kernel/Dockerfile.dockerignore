@@ -7,7 +7,6 @@
 !kernel/logo/
 !kernel/configure.sh
 !kernel/build.sh
-!kernel/export-regdb-certs.py
 # The boot-logo master, and nothing else out of rootfs/: that directory also
 # holds the committed Wi-Fi firmware drop and the alpine bring-up root, which
 # this build has no use for.

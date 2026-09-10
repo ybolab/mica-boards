@@ -103,7 +103,7 @@ ARG KERNEL_EXPECT=6.1.115
 COPY kernel/build.sh /bsp/kernel/build.sh
 RUN bash /bsp/kernel/build.sh /ksrc "${KERNEL_EXPECT}"
 
-COPY kernel/export-regdb-certs.py /bsp/kernel/export-regdb-certs.py
+COPY --from=mos-common export-regdb-certs.py /bsp/kernel/export-regdb-certs.py
 RUN python3 /bsp/kernel/export-regdb-certs.py /ksrc /regdb-certs.pem
 
 # THE RESOLVED CONFIG IS AN ARTIFACT, as it already is on x64 and virt-arm64:
