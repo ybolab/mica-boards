@@ -9,3 +9,4 @@
 0002-wireless-makefile-gate-aic8800-by-aic-wlan-support.patch
 0003-mali-deterministic-build-date.patch
 0004-arm64-dts-rockchip-register-cx3576z-dtb.patch
+0005-mpp-rkvenc2-rk3576-fixed-rate-opp.patch
