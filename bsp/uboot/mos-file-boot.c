@@ -191,3 +191,15 @@ void __noreturn mos_file_boot(void)
 	do_reset(NULL, 0, 0, NULL);
 	hang();
 }
+
+static int do_mosboot(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+{
+	(void)cmdtp;
+	(void)flag;
+	(void)argc;
+	(void)argv;
+	mos_file_boot();
+}
+
+U_BOOT_CMD(mosboot, 1, 0, do_mosboot,
+	   "boot the selected signed MOS deployment", "");

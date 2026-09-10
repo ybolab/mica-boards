@@ -1,37 +1,11 @@
 Subject: [PATCH] boot: add fixed signed FIT deployment policy hooks
 
-The production policy runs before preboot commands or any CLI. It transports
-only the validated deployment digest through chosen after FIT verification.
+The mosboot command runs the signed policy through standard U-Boot autoboot.
+It transports only the validated deployment digest after FIT verification.
 Environment counter writes flush an enabled eMMC cache before read-back.
 
 Upstream-Status: Inappropriate [board integration]
 
---- a/common/main.c
-+++ b/common/main.c
-@@ -39,6 +39,10 @@
- 	}
- }
- 
-+#if defined(CONFIG_MOS_FILE_BOOT)
-+void __noreturn mos_file_boot(void);
-+#endif
-+
- /* We come here after U-Boot is initialised and ready to process commands */
- void main_loop(void)
- {
-@@ -48,6 +52,12 @@
- 
- 	if (IS_ENABLED(CONFIG_VERSION_VARIABLE))
- 		env_set("ver", version_string);  /* set version variable */
-+
-+	if (IS_ENABLED(CONFIG_MOS_FILE_BOOT)) {
-+#if defined(CONFIG_MOS_FILE_BOOT)
-+		mos_file_boot();
-+#endif
-+	}
- 
- 	cli_init();
- 
 --- a/common/Makefile
 +++ b/common/Makefile
 @@ -107,3 +107,7 @@
@@ -55,7 +29,7 @@ Upstream-Status: Inappropriate [board integration]
 +	help
 +	  Select bounded deployment records from raw redundant environment storage.
 +	  Persist trial counters before loading a required signed FIT. Persistent
-+	  environment commands and interactive boot selection are not used.
++	  environment commands are not imported; mosboot uses the standard CLI.
 --- a/boot/fdt_support.c
 +++ b/boot/fdt_support.c
 @@ -346,6 +346,18 @@
