@@ -11,7 +11,7 @@ make -C bl33/v2023 CROSS_COMPILE=aarch64-none-elf- s7d_bm201_config
 make -C bl33/v2023 CROSS_COMPILE=aarch64-none-elf- -j8
 output=/uboot/bl33/v2023/build
 config=$output/.config
-for option in MOS_FILE_BOOT ENV_IS_NOWHERE FIT FIT_SIGNATURE RSA RSA_VERIFY SHA256 \
+for option in MOS_FILE_BOOT ENV_IS_NOWHERE FIT FIT_SIGNATURE RSA RSA_VERIFY SHA256 ZSTD \
     CMD_BOOTM FS_EXT4 EFI_PARTITION WDT WATCHDOG WDT_MESON VIDEO USB_KEYBOARD; do
     grep -qx "CONFIG_$option=y" "$config" || { echo "error: missing $option" >&2; exit 1; }
 done
