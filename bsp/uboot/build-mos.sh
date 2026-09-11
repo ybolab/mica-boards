@@ -18,12 +18,12 @@ scripts/config --enable MOS_FILE_BOOT --enable ENV_IS_NOWHERE \
     --enable AUTOBOOT --enable CMDLINE --enable HUSH_PARSER --enable CMD_BOOTD --enable CMD_RUN \
     --disable AUTOBOOT_KEYED --enable USE_BOOTCOMMAND --set-str BOOTCOMMAND mosboot \
     --set-val BOOTDELAY 1 \
-    --enable FIT --enable FIT_SIGNATURE --enable FIT_FULL_CHECK \
+    --enable FIT --enable FIT_SIGNATURE --enable FIT_FULL_CHECK --enable ZSTD \
     --enable IMAGE_SIGN_INFO --enable RSA --enable RSA_VERIFY --enable CMD_BOOTM \
     --enable FS_EXT4 --enable WDT --enable WATCHDOG --enable DESIGNWARE_WATCHDOG \
     --set-val WATCHDOG_TIMEOUT_MSECS 120000
 make olddefconfig
-for symbol in MOS_FILE_BOOT ENV_IS_NOWHERE FIT FIT_SIGNATURE FIT_FULL_CHECK \
+for symbol in MOS_FILE_BOOT ENV_IS_NOWHERE FIT FIT_SIGNATURE FIT_FULL_CHECK ZSTD \
     IMAGE_SIGN_INFO RSA RSA_VERIFY CMD_BOOTM FS_EXT4 WDT WATCHDOG DESIGNWARE_WATCHDOG \
     AUTOBOOT CMDLINE HUSH_PARSER CMD_BOOTD CMD_RUN USE_BOOTCOMMAND; do
     grep -qx "CONFIG_${symbol}=y" .config || { echo "error: missing ${symbol}" >&2; exit 1; }
@@ -37,9 +37,9 @@ grep -qx 'CONFIG_BOOTDELAY=1' .config
 grep -qx 'CONFIG_BOOTCOMMAND="mosboot"' .config
 bash "$TOOLS_DIR/tests/autoboot.sh" "$SRC"
 bash "$TOOLS_DIR/tests/watchdog.sh" "$SRC"
-make -j8 CROSS_COMPILE=aarch64-linux-gnu- ROCKCHIP_TPL="$DDR" BL31="$BL31"
+make -j"$(nproc)" CROSS_COMPILE=aarch64-linux-gnu- ROCKCHIP_TPL="$DDR" BL31="$BL31"
 bash "$TOOLS_DIR/embed-trust.sh" u-boot.dtb "$CERTIFICATE" mos-control.dtb "$SRC/tools"
-make -j8 CROSS_COMPILE=aarch64-linux-gnu- ROCKCHIP_TPL="$DDR" BL31="$BL31" EXT_DTB="$SRC/mos-control.dtb"
+make -j"$(nproc)" CROSS_COMPILE=aarch64-linux-gnu- ROCKCHIP_TPL="$DDR" BL31="$BL31" EXT_DTB="$SRC/mos-control.dtb"
 cmp u-boot.dtb mos-control.dtb
 # A control-FDT override must not skip the configured countdown or native CLI.
 if fdtget -p u-boot.dtb /config 2>/dev/null | grep -Ec '^(bootdelay|bootcmd|bootsecure)$' >/dev/null; then

@@ -64,6 +64,7 @@ scripts/config --enable CMD_ROCKUSB \
                --enable CMD_BUTTON \
                --enable CMD_ADC \
                --enable FIT \
+               --enable ZSTD \
                --set-val BOOTDELAY 1 \
                --set-val SYS_BOOTM_LEN 0x8000000 \
                --enable USE_PREBOOT \
@@ -77,6 +78,7 @@ require '^CONFIG_BUTTON_ADC=y'
 require '^CONFIG_CMD_ROCKUSB=y'
 require '^CONFIG_USB_FUNCTION_ROCKUSB=y'
 require '^CONFIG_FIT=y'
+require '^CONFIG_ZSTD=y$'
 require '^CONFIG_BOOTDELAY=1$'
 require '^CONFIG_SYS_BOOTM_LEN=0x8000000$'
 require '^CONFIG_USE_PREBOOT=y'
