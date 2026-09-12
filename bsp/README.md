@@ -89,4 +89,4 @@ carrying every partition, and `rkdeveloptool wl 0` writes it in one step from
 both Loader and Maskrom.
 
 Upstream provenance and the deliberate deviations from it are recorded in
-`docs/design/bsp-cx3576-sync.md`.
+`docs/boards/cx3576-bsp-sync.md`.

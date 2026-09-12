@@ -53,7 +53,7 @@
  * from the base of DRAM -- it is inside the bank on every memory SKU, which a
  * high address chosen against this 8 GiB unit would not be. It is NOT a
  * measured-free address: nothing off-board can prove the loader leaves it
- * alone, so docs/bsp/cx3576-bench.md carries the row that does.
+ * alone, so docs/boards/cx3576-bench.md carries the row that does.
  *
  * `no-map` AND NOT `reusable`, and the two are not interchangeable here.
  * `reusable` hands a region to the allocator on the understanding that a
