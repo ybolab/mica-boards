@@ -68,4 +68,4 @@ perform bootloader maintenance, and the generic firmware-maintain command
 refuses this board until a dedicated Amlogic maintenance transport is qualified.
 
 Physical installation, boot0 selection, watchdog handoff and peripheral behavior
-remain subject to the [board dossier](../../../../docs/bsp/s905x5m.md).
+remain subject to the [board dossier](../../../../docs/boards/s905x5m.md).

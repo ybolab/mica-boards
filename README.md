@@ -4,7 +4,7 @@ BM201 / X88 Pro X5M, Amlogic S7D, arm64. The current delivery boots a signed
 MOS deployment from SD using the paired MOS U-Boot installed in eMMC boot0.
 The SD image is not a standalone bootloader image. Physical qualification is
 pending; `BOARD_RELEASE_TARGET=0` remains set. See the
-[board dossier](../../docs/bsp/s905x5m.md) and [firmware operations](bsp/uboot/README.md).
+[board dossier](../../docs/boards/s905x5m.md) and [firmware operations](bsp/uboot/README.md).
 
 ## Build inputs
 
