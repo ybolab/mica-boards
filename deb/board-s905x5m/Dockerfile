@@ -14,6 +14,9 @@ COPY control/ /in/control/
 ARG MOS_DEB_VERSION
 ARG MOS_DEB_ARCH
 ARG SOURCE_DATE_EPOCH
+# Provenance, written into the control file by pack.sh; see build-env/deb/README.md.
+ARG MOS_DEB_SOURCE_REPO
+ARG MOS_DEB_SOURCE_COMMIT
 RUN bash /in/stage.sh
 FROM scratch AS out
 COPY --from=pack /out/ /
