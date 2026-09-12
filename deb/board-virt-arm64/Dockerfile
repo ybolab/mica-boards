@@ -12,6 +12,9 @@ COPY --from=overlay etc/fstab.in /src/rootfs/overlay/etc/fstab.in
 ARG MOS_DEB_VERSION
 ARG MOS_DEB_ARCH
 ARG SOURCE_DATE_EPOCH
+# Provenance, written into the control file by pack.sh; see build-env/deb/README.md.
+ARG MOS_DEB_SOURCE_REPO
+ARG MOS_DEB_SOURCE_COMMIT
 RUN set -eu; \
     bash /in/render.sh /src /render; \
     install -D -m 0644 /render/fstab /stage/etc/fstab; \
