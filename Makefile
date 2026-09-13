@@ -64,8 +64,10 @@ pool: preflight
 package-gate:
 	bash build-env/deb/package-gate.sh
 
+# One architecture: this board builds for amd64 alone, and publish.sh takes
+# both pools by default.
 publish:
-	bash build-env/deb/publish.sh
+	bash build-env/deb/publish.sh --arch amd64
 
 kernel-config-test:
 	bash boot/common/kernel-config-test.sh x64 bsp/kernel/config/x64.config bsp/kernel/Dockerfile
