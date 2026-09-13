@@ -129,6 +129,19 @@ for dir in */; do
         case " ${cmdline} " in *" ${arg} "*) ;; *) fail "${board}: BOARD_CMDLINE_ARGS is the authenticated command line and lacks ${arg}" ;; esac
     done
 
+    # BOARD_RADIOS, BOARD_HAS_STATUS_LED and BOARD_HAS_DISPLAY are readings of
+    # BOARD_FEATURES while their readers remain (the board packages' own
+    # Dockerfiles, the assembly's compose stages); the two may not disagree.
+    radios="$(plain_value "${board}/board.env" BOARD_RADIOS || true)"
+    want=""; for f in ${features}; do case "${f}" in wifi | bluetooth) want="${want}${f} " ;; esac; done
+    [ "$(printf '%s\n' ${radios} | sort | tr '\n' ' ')" = "$(printf '%s\n' ${want} | sort | tr '\n' ' ')" ] || fail "${board}: BOARD_RADIOS=\"${radios}\" does not read BOARD_FEATURES' radios (${want% })"
+    for pair in BOARD_HAS_STATUS_LED:status-led BOARD_HAS_DISPLAY:display; do
+        key="${pair%%:*}"; feat="${pair#*:}"; have=0
+        in_list "${feat}" ${features} && have=1
+        v="$(plain_value "${board}/board.env" "${key}" || true)"
+        [ "${v:-0}" = "${have}" ] || fail "${board}: ${key}=${v:-unset} disagrees with BOARD_FEATURES (${feat}: ${have})"
+    done
+
     hook="${board}/deb/kernel-${board}/prepare.sh"
     if [ -f "${hook}" ]; then
         grep -c 'manifests' "${hook}" >/dev/null || fail "${hook} does not stage manifests/ into the bundle"
