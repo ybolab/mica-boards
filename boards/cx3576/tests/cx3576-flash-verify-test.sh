@@ -2,8 +2,9 @@
 # Exercise full-image preflight, readback and reset ordering against a fake medium.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-mkdir -p "$PWD/_out"
-work=$(mktemp -d "$PWD/_out/cx-flash-check.XXXXXX")
+# Scratch under the repository's _out, not the board's: a board directory is data.
+mkdir -p "$PWD/../../_out"
+work=$(mktemp -d "$PWD/../../_out/cx-flash-check.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 export RK_DEVICE="$work/medium" RK_LOG="$work/calls"
 cat > "$work/rkdeveloptool" <<'STUB'
