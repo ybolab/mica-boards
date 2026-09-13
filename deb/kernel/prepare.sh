@@ -34,7 +34,7 @@ present "${TRUST_CERT}" "the verity trust certificate the kernel was built again
 present "${REPO_ROOT}/board.env" "the board definition" || true
 # evidence.json is a board record some boards carry; it is staged when present
 # and its absence is not a missing input.
-for t in uboot-mos; do present "${OUT}/${t}" "run `make uboot-mos`" || true; done
+for t in uboot-mos; do present "${OUT}/${t}" "run 'make uboot-mos'" || true; done
 
 if [ "${PREFLIGHT}" != 0 ]; then
     printf 'preflight-examined: %s\npreflight-missing: %s\npreflight-warned: %s\n' "${examined}" "${missing}" "${warned}"
