@@ -4,7 +4,7 @@
 # out of its bundle, and nothing the bundle no longer carries.
 #
 #   - board.env declares BOARD_FEATURES (a subset of the vocabulary below),
-#     BOARD_FAMILY (an existing family, included by the board's bsp/Makefile,
+#     BOARD_FAMILY (an existing family, included by the board's Makefile,
 #     with a bsp.env for the FIT families) and IMAGE_KINDS (a subset of its
 #     vocabulary), as plain KEY=value lines;
 #   - manifests/board.pkgs exists and names at least one package; every
@@ -12,7 +12,7 @@
 #     of this repository emits (build-env/deb/producers.sh);
 #   - manifests/radio-<r>.pkgs names a radio in BOARD_FEATURES,
 #     manifests/component-<c>.pkgs a word; any other manifest name is refused;
-#   - deb/kernel-<board>/prepare.sh stages manifests/ into the bundle;
+#   - a board carries no producer: producers/board and producers/kernel run over every board;
 #   - bsp/containers.env is gone: the product decides features, not the board.
 #
 # Discovered, not listed: a board is a directory with a board.env.
@@ -46,14 +46,14 @@ done < <(bash build-env/deb/producers.sh)
 [ -n "${declared// /}" ] || { echo "FAIL: build-env/deb/producers.sh named no package" >&2; exit 1; }
 
 boards=0
-for dir in */; do
-    board="${dir%/}"
-    [ -f "${board}/board.env" ] || continue
+for dir in boards/*/; do
+    board="$(basename "${dir}")"
+    [ -f "boards/${board}/board.env" ] || continue
     boards=$((boards + 1))
 
     for key in BOARD_FEATURES BOARD_FAMILY IMAGE_KINDS; do
-        if ! value="$(plain_value "${board}/board.env" "${key}")"; then
-            fail "${board}/board.env declares no ${key} (or not as a plain KEY=value line)"
+        if ! value="$(plain_value "boards/${board}/board.env" "${key}")"; then
+            fail "boards/${board}/board.env declares no ${key} (or not as a plain KEY=value line)"
             continue
         fi
         case "${key}" in
@@ -65,18 +65,18 @@ for dir in */; do
         BOARD_FAMILY)
             [[ "${value}" =~ ^[a-z0-9-]+$ ]] || fail "${board}: BOARD_FAMILY '${value}' is not one lowercase word"
             [ -f "families/${value}/Makefile.inc" ] || fail "${board}: BOARD_FAMILY names '${value}', and families/${value}/Makefile.inc does not exist"
-            grep -c "include ../../families/${value}/Makefile.inc" "${board}/bsp/Makefile" >/dev/null || fail "${board}/bsp/Makefile does not include families/${value}/Makefile.inc"
-            [ "${value}" = uefi ] || [ -f "${board}/bsp/bsp.env" ] || fail "${board}/bsp/bsp.env is missing; a FIT family board names its kernel and U-Boot inputs there" ;;
+            grep -c "include ../../families/${value}/Makefile.inc" "boards/${board}/Makefile" >/dev/null || fail "boards/${board}/Makefile does not include families/${value}/Makefile.inc"
+            [ "${value}" = uefi ] || [ -f "boards/${board}/bsp.env" ] || fail "boards/${board}/bsp.env is missing; a FIT family board names its kernel and U-Boot inputs there" ;;
         esac
         pass
     done
-    features="$(plain_value "${board}/board.env" BOARD_FEATURES || true)"
+    features="$(plain_value "boards/${board}/board.env" BOARD_FEATURES || true)"
 
-    if [ ! -f "${board}/manifests/board.pkgs" ]; then
-        fail "${board}/manifests/board.pkgs is missing; the bundle would carry no board package manifest"
+    if [ ! -f "boards/${board}/manifests/board.pkgs" ]; then
+        fail "boards/${board}/manifests/board.pkgs is missing; the bundle would carry no board package manifest"
     fi
     shopt -s nullglob
-    for m in "${board}"/manifests/*.pkgs; do
+    for m in "boards/${board}"/manifests/*.pkgs; do
         base="$(basename "${m}" .pkgs)"
         case "${base}" in
         board) ;;
@@ -106,25 +106,25 @@ for dir in */; do
     # agrees with the boot backend, a FIT board names its device tree, its
     # watchdog symbol, its three load addresses and its loader, and every
     # board's command line carries the signed-boot floor.
-    backend="$(plain_value "${board}/board.env" BOOT_BACKEND || true)"
-    format="$(plain_value "${board}/board.env" FIRMWARE_FORMAT || true)"
+    backend="$(plain_value "boards/${board}/board.env" BOOT_BACKEND || true)"
+    format="$(plain_value "boards/${board}/board.env" FIRMWARE_FORMAT || true)"
     case "${backend}:${format}" in
     systemd-boot:efi | uboot-fit:rockchip-loader | uboot-fit:amlogic-boot0) pass ;;
     *) fail "${board}: BOOT_BACKEND=${backend:-unset} with FIRMWARE_FORMAT=${format:-unset}; systemd-boot boots efi, uboot-fit a rockchip-loader or an amlogic-boot0" ;;
     esac
     if [ "${backend}" = uboot-fit ]; then
         for key in FIT_DTB FIT_WATCHDOG FIT_LOAD_ADDRESSES UBOOT_BIN_NAME UBOOT_MAX_BYTES; do
-            v="$(plain_value "${board}/board.env" "${key}" || true)"
+            v="$(plain_value "boards/${board}/board.env" "${key}" || true)"
             [ -n "${v}" ] || fail "${board}: a FIT board declares ${key}"
         done
-        addrs="$(plain_value "${board}/board.env" FIT_LOAD_ADDRESSES || true)"
+        addrs="$(plain_value "boards/${board}/board.env" FIT_LOAD_ADDRESSES || true)"
         [ "$(printf '%s\n' ${addrs} | grep -cE '^0x[0-9a-fA-F]+$')" -eq 3 ] || fail "${board}: FIT_LOAD_ADDRESSES is three hexadecimal addresses (kernel, initramfs, device tree), not '${addrs}'"
         case "${format}" in
-        amlogic-boot0) for key in UBOOT_MIN_BYTES UBOOT_PAYLOAD_OFFSET_BYTES; do [ -n "$(plain_value "${board}/board.env" "${key}" || true)" ] || fail "${board}: an amlogic-boot0 board declares ${key}"; done ;;
-        rockchip-loader) for key in UBOOT_SEEK_SECTOR LOADER_MAGIC_HEX; do [ -n "$(plain_value "${board}/board.env" "${key}" || true)" ] || fail "${board}: a rockchip-loader board declares ${key}"; done ;;
+        amlogic-boot0) for key in UBOOT_MIN_BYTES UBOOT_PAYLOAD_OFFSET_BYTES; do [ -n "$(plain_value "boards/${board}/board.env" "${key}" || true)" ] || fail "${board}: an amlogic-boot0 board declares ${key}"; done ;;
+        rockchip-loader) for key in UBOOT_SEEK_SECTOR LOADER_MAGIC_HEX; do [ -n "$(plain_value "boards/${board}/board.env" "${key}" || true)" ] || fail "${board}: a rockchip-loader board declares ${key}"; done ;;
         esac
     fi
-    cmdline="$(plain_value "${board}/board.env" BOARD_CMDLINE_ARGS || true)"
+    cmdline="$(plain_value "boards/${board}/board.env" BOARD_CMDLINE_ARGS || true)"
     for arg in dm_verity.require_signatures=1 rdinit=/init; do
         case " ${cmdline} " in *" ${arg} "*) ;; *) fail "${board}: BOARD_CMDLINE_ARGS is the authenticated command line and lacks ${arg}" ;; esac
     done
@@ -133,18 +133,19 @@ for dir in */; do
     # to be paired with (BOARD_RADIOS, BOARD_HAS_STATUS_LED, BOARD_HAS_DISPLAY)
     # are gone, and a board that still carries one has two places to disagree.
     for key in BOARD_RADIOS BOARD_HAS_STATUS_LED BOARD_HAS_DISPLAY; do
-        ! grep -q "^${key}=" "${board}/board.env" || fail "${board}: board.env still declares ${key}; BOARD_FEATURES is the capability set and its readers read it"
+        ! grep -q "^${key}=" "boards/${board}/board.env" || fail "${board}: board.env still declares ${key}; BOARD_FEATURES is the capability set and its readers read it"
     done
 
-    hook="${board}/deb/kernel-${board}/prepare.sh"
-    if [ -f "${hook}" ]; then
-        grep -c 'manifests' "${hook}" >/dev/null || fail "${hook} does not stage manifests/ into the bundle"
-        ! grep -c 'containers.env' "${hook}" >/dev/null || fail "${hook} still stages containers.env; the product decides features"
-        pass
-    else
-        fail "${hook} is missing"
-    fi
-    [ ! -e "${board}/bsp/containers.env" ] || fail "${board}/bsp/containers.env exists; that switch moved to the product"
+    # The board is data: no producer of its own (producers/board and
+    # producers/kernel run over every board), and the two control templates
+    # it does carry are the package's and the bundle's.
+    stray="$(find "boards/${board}" -path "boards/${board}/extras" -prune -o -name producer.env -print)"
+    [ -z "${stray}" ] || fail "boards/${board} carries a producer.env outside extras/ (${stray}); a board is data, the producers are under producers/"
+    [ -f "boards/${board}/package/control/mica-board-${board}.control" ] || fail "boards/${board}/package/control/mica-board-${board}.control is missing; the board package's control template"
+    [ -f "boards/${board}/kernel/control/mica-kernel-${board}.control" ] || fail "boards/${board}/kernel/control/mica-kernel-${board}.control is missing; the bundle's control template"
+    grep -q '^BOARD_PACKAGE_ENABLEMENT=[0-9]\+$' "boards/${board}/board.env" || fail "${board}: board.env declares no BOARD_PACKAGE_ENABLEMENT (how many units the board package enables; the gate holds it)"
+    pass
+    [ ! -e "boards/${board}/containers.env" ] || fail "boards/${board}/containers.env exists; that switch moved to the product"
 done
 [ "${boards}" -gt 0 ] || { echo "FAIL: no directory with a board.env; the loop above checked nothing" >&2; exit 1; }
 

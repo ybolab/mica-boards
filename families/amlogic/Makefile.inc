@@ -1,4 +1,4 @@
-# The amlogic family's targets, included by <board>/bsp/Makefile after it
+# The amlogic family's targets, included by boards/<board>/Makefile after it
 # sets BOARD. The family owns the kernel and U-Boot orchestration
 # (kernel/Dockerfile, kernel/configure.sh, kernel/build.sh, uboot/Dockerfile)
 # and the source pins (family.env); the board owns its configuration and
@@ -10,7 +10,7 @@
 #   make kernel   -> $(BSP_OUT)/kernel/{Image,modules.tar,<dtb>,config,kernel.release,System.map,regdb-certs.pem}
 #   make uboot    -> $(BSP_OUT)/uboot/ (the signed U-Boot, DDR.USB, the FIT tools)
 ifeq ($(BOARD),)
-$(error BOARD is not set; a board's bsp/Makefile sets it before including this file)
+$(error BOARD is not set; a board's Makefile sets it before including this file)
 endif
 FAMILIES_DIR := ../../families
 FAMILY_DIR := $(FAMILIES_DIR)/amlogic
@@ -47,7 +47,7 @@ uboot:
 	  --build-context mos-common=../../boot/common --build-context "mos-boot-trust=$$TRUST_DIR" \
 	  --build-arg UBOOT_REPO=$(UBOOT_REPO) --build-arg UBOOT_COMMIT=$(UBOOT_COMMIT) \
 	  -f $(FAMILY_DIR)/uboot/Dockerfile $$IMG \
-	  -o $(BSP_OUT)/uboot uboot
+	  -o $(BSP_OUT)/uboot loader
 
 # What the family builds; a board adds its own (s905x5m: uboot-package).
 firmware: uboot

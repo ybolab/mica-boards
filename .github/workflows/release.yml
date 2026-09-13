@@ -1,13 +1,21 @@
 name: release
 # The offline gates on every push; the pool -- every board package and
-# every kernel archive -- is built and published by workflow_dispatch, with
-# the deployment's trust certificates supplied as secrets, because a kernel
-# built against a throwaway certificate is of no use to the assembly.
+# every kernel archive -- and every board's bundle artifact are built and
+# published to the registry by workflow_dispatch, with the deployment's
+# trust certificates supplied as secrets, because a kernel built against a
+# throwaway certificate is of no use to the assembly. Publishing is CI's:
+# a developer machine builds and gates, and does not push.
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
+# The pool and every board's bundle are pushed to ghcr.io/ybolab by this
+# workflow's own token; the source pins are read with MICA_DEPS_TOKEN, which
+# needs read:packages.
+permissions:
+  contents: read
+  packages: write
 jobs:
   check:
     runs-on: ubuntu-latest

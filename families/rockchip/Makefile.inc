@@ -1,4 +1,4 @@
-# The rockchip family's targets, included by <board>/bsp/Makefile after it
+# The rockchip family's targets, included by boards/<board>/Makefile after it
 # sets BOARD. The family owns the kernel and U-Boot orchestration
 # (kernel/Dockerfile, kernel/configure.sh, kernel/build.sh, uboot/Dockerfile)
 # and the source pins (family.env); the board owns its configuration, device
@@ -13,7 +13,7 @@
 # WHERE THE ARTEFACTS GO. `_out/<board>/`, the one directory every build
 # product lives in and a clean removes (RFCT-343); overridable.
 ifeq ($(BOARD),)
-$(error BOARD is not set; a board's bsp/Makefile sets it before including this file)
+$(error BOARD is not set; a board's Makefile sets it before including this file)
 endif
 FAMILIES_DIR := ../../families
 FAMILY_DIR := $(FAMILIES_DIR)/rockchip
@@ -62,7 +62,7 @@ uboot-mos:
 	  --build-arg DDR_BLOB=$(DDR_BLOB) --build-arg BL31_BLOB=$(BL31_BLOB) \
 	  --build-arg UBOOT_DEFCONFIG=$(UBOOT_DEFCONFIG) \
 	  -f $(FAMILY_DIR)/uboot/Dockerfile --target artifact-mos $$IMG \
-	  -o $(BSP_OUT)/uboot-mos uboot
+	  -o $(BSP_OUT)/uboot-mos loader
 
 firmware: uboot-mos
 clean:

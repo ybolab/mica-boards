@@ -7,16 +7,16 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 n=0
-for env in */board.env; do
-    board="${env%/board.env}"
+for env in boards/*/board.env; do
+    board="$(basename "$(dirname "${env}")")"
     family="$(sed -n 's/^BOARD_FAMILY=//p' "${env}" | head -1)"
     [ -n "${family}" ] || { echo "error: ${env} declares no BOARD_FAMILY" >&2; exit 1; }
     if [ "${family}" = uefi ]; then
-        config="${board}/bsp/kernel/config/${board}.config"; gate="families/uefi/kernel/Dockerfile"
+        config="boards/${board}/kernel/config/${board}.config"; gate="families/uefi/kernel/Dockerfile"
     else
-        name="$(sed -n 's/^KERNEL_CONFIG=//p' "${board}/bsp/bsp.env" | head -1)"
-        [ -n "${name}" ] || { echo "error: ${board}/bsp/bsp.env declares no KERNEL_CONFIG" >&2; exit 1; }
-        config="${board}/bsp/kernel/config/${name}"; gate="families/${family}/kernel/configure.sh"
+        name="$(sed -n 's/^KERNEL_CONFIG=//p' "boards/${board}/bsp.env" | head -1)"
+        [ -n "${name}" ] || { echo "error: boards/${board}/bsp.env declares no KERNEL_CONFIG" >&2; exit 1; }
+        config="boards/${board}/kernel/config/${name}"; gate="families/${family}/kernel/configure.sh"
     fi
     bash boot/common/kernel-config-test.sh "${board}" "${config}" "${gate}"
     n=$((n + 1))

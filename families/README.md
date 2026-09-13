@@ -17,23 +17,23 @@ families/
   uefi/                 x64, virt-arm64: mainline stable, a signed UKI through systemd-boot
     family.env          KERNEL_SOURCE
     Makefile.inc        kernel, kernel-config; the architecture table (amd64, arm64)
-    kernel/Dockerfile   one build for every architecture; context = <board>/bsp/kernel
+    kernel/Dockerfile   one build for every architecture; context = boards/<board>/kernel
   rockchip/             cx3576: the Rockchip vendor tree, mainline U-Boot with rkbin, a signed FIT
     family.env          KERNEL_REPO, KERNEL_COMMIT, KERNEL_EXPECT, RKBIN_*, UBOOT_*
     Makefile.inc        kernel, uboot-mos
-    kernel/             Dockerfile, configure.sh, build.sh; context = <board>/bsp
-    uboot/Dockerfile    context = <board>/bsp/uboot (the board's policy scripts, patches, tests, loader)
+    kernel/             Dockerfile, configure.sh, build.sh; context = boards/<board>
+    uboot/Dockerfile    context = boards/<board>/loader (the board's policy scripts, patches, tests, loader)
   amlogic/              s905x5m: the Hardkernel vendor tree, CoreELEC's U-Boot, a signed FIT
     family.env          KERNEL_REPO, KERNEL_COMMIT, KERNEL_EXPECT, UBOOT_*
     Makefile.inc        kernel, uboot
-    kernel/             Dockerfile, configure.sh, build.sh; context = <board>/bsp
-    uboot/Dockerfile    context = <board>/bsp/uboot
+    kernel/             Dockerfile, configure.sh, build.sh; context = boards/<board>
+    uboot/Dockerfile    context = boards/<board>/loader
 ```
 
-A board's `bsp/Makefile` sets `BOARD` and includes its family's
+A board's `Makefile` (`boards/<board>/Makefile`) sets `BOARD` and includes its family's
 `Makefile.inc`; it keeps the targets that are the board's own (flashing, a
 recovery package, a userland bridge). A FIT board names its files in
-`bsp/bsp.env` (plain `KEY=value`, included by make and handed to the
+`bsp.env` (plain `KEY=value`, included by make and handed to the
 Dockerfiles as build arguments): `KERNEL_CONFIG`, `KERNEL_DTB`,
 `KERNEL_DTB_ARTIFACT`, and for rockchip `UBOOT_DEFCONFIG`, `DDR_BLOB`,
 `BL31_BLOB`; for amlogic `KERNEL_FRAGMENTS`, the merge order of its config
@@ -44,7 +44,7 @@ has no `bsp.env`: its `kernel/versions.env` pins the tag and its
 ## The hooks
 
 The FIT families' kernel builds call these scripts from the board's
-`bsp/kernel/hooks/` when they exist; a board with none builds the family's
+`kernel/hooks/` when they exist; a board with none builds the family's
 plain kernel. Each receives the source tree first; CROSS_COMPILE is in the
 environment where the family sets it.
 

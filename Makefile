@@ -20,7 +20,7 @@ endif
 endif
 
 # The boards, discovered: a directory with a board.env. Nothing here names one.
-BOARDS := $(patsubst %/board.env,%,$(wildcard */board.env))
+BOARDS := $(patsubst boards/%/board.env,%,$(wildcard boards/*/board.env))
 
 .PHONY: help deps deps-check deps-bump build-env preflight pool package-gate publish board-contract-test kernel-config-test kernel-cmdline-test bench-collector-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test lint check
 
@@ -55,7 +55,7 @@ build-env:
 # open-ended, and a new board gets its rule the day its board.env lands.
 define board_delegation
 $(1)-%:
-	$$(MAKE) -C $(1)/bsp $$*
+	$$(MAKE) -C boards/$(1) $$*
 endef
 $(foreach b,$(BOARDS),$(eval $(call board_delegation,$(b))))
 
@@ -95,19 +95,19 @@ kernel-config-test:
 	bash tools/kernel-config-test.sh
 
 kernel-cmdline-test:
-	bash cx3576/tests/kernel-cmdline-test.sh
+	bash boards/cx3576/tests/kernel-cmdline-test.sh
 bench-collector-test:
-	bash cx3576/tests/bench/collector-test.sh
+	bash boards/cx3576/tests/bench/collector-test.sh
 mac-stable-test:
-	bash cx3576/tests/mac-stable-test.sh
+	bash boards/cx3576/tests/mac-stable-test.sh
 gadget-configfs-test:
-	bash cx3576/tests/gadget-configfs-test.sh
+	bash boards/cx3576/tests/gadget-configfs-test.sh
 flash-verify-test:
-	bash cx3576/tests/cx3576-flash-verify-test.sh
+	bash boards/cx3576/tests/cx3576-flash-verify-test.sh
 wireless-test:
-	bash s905x5m/tests/s905x5m-wireless.sh
+	bash boards/s905x5m/tests/s905x5m-wireless.sh
 
 lint:
-	bash gate/shell-lint.sh
+	bash tests/shell-lint.sh
 
 check: lint board-contract-test kernel-config-test kernel-cmdline-test bench-collector-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test

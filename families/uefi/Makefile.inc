@@ -1,4 +1,4 @@
-# The uefi family's targets, included by <board>/bsp/Makefile after it sets
+# The uefi family's targets, included by boards/<board>/Makefile after it sets
 # BOARD. One kernel Dockerfile serves every board of the family; what differs
 # per board is its architecture (read from ../board.env) and its own
 # kernel/config/ and kernel/versions.env, which are the build context.
@@ -12,7 +12,7 @@
 # cost). Overridable, because a build that wants to keep a tree aside should
 # not have to edit this file.
 ifeq ($(BOARD),)
-$(error BOARD is not set; a board's bsp/Makefile sets it before including this file)
+$(error BOARD is not set; a board's Makefile sets it before including this file)
 endif
 FAMILY_DIR := ../../families/uefi
 include $(FAMILY_DIR)/family.env
@@ -37,7 +37,7 @@ VERITY_TOOL := ../../boot/verity-tool.sh
 # from and what the toolchain needs to cross to it. Keyed by the board's
 # MICA_ARCH, read here from board.env because that file is the one statement
 # of a board's architecture. A missing or unknown value is refused by name.
-MICA_ARCH := $(shell sed -n 's/^MICA_ARCH=//p' ../board.env)
+MICA_ARCH := $(shell sed -n 's/^MICA_ARCH=//p' board.env)
 ifeq ($(MICA_ARCH),amd64)
 KERNEL_ARGS := --build-arg KERNEL_DEFCONFIG=x86_64_defconfig \
   --build-arg KERNEL_IMAGE=bzImage --build-arg KERNEL_IMAGE_PATH=arch/x86/boot/bzImage \

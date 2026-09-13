@@ -44,7 +44,7 @@ kind_of() { case "$1" in board.env) echo env ;; evidence.json) echo evidence ;; 
 
 published=0
 present=0
-for env in "${REPO_ROOT}"/*/board.env; do
+for env in "${REPO_ROOT}"/boards/*/board.env; do
     board="$(basename "$(dirname "${env}")")"
     arch="$(sed -n 's/^MICA_ARCH=//p' "${env}")"
     debs=("${POOL_ROOT}/${arch}/pool/mica-kernel-${board}_"*"_${arch}.deb")
