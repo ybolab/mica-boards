@@ -1,10 +1,10 @@
-Package: mos-board-virt-arm64
+Package: mica-board-virt-arm64
 Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: mos build <mos@example.invalid>
 Section: admin
 Priority: optional
-Depends: mos-system (= @VERSION@)
+Depends: mica-system
 Description: mos virt-arm64 three-partition storage policy
  DATA mount and growth, read-only ESP mount and fixed SYSTEM geometry.
  Kernel, verified support image and boot firmware are separate artifacts.

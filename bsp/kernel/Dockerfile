@@ -2,7 +2,7 @@
 # check=skip=InvalidDefaultArgInFrom
 # The virt-arm64 kernel: mainline stable, configured by this repository, built here.
 #
-#   make virt-arm64-kernel         -> _out/boards/virt-arm64/kernel/{Image,modules.tar,config,kernel.release}
+#   make virt-arm64-kernel         -> _out/kernel/{Image,modules.tar,config,kernel.release}
 #   make virt-arm64-kernel-config  -> rewrites config/virt-arm64.config from this build
 #
 # This producer embeds the explicit public content anchors and configures
@@ -15,7 +15,7 @@
 # identical result; nothing in this stage needs to RUN an aarch64 binary.
 
 # The builder image, injected from build-env/images.env by build-env/from.sh,
-# which boards/virt-arm64/bsp/Makefile calls. Ubuntu 24.04 and not mos-build-c,
+# which bsp/Makefile calls. Ubuntu 24.04 and not mica-build-c,
 # the choice both other boards make and for the same structural reason: a BSP
 # builder is pinned by digest and depends on nothing this repository has to
 # build first, so `make virt-arm64-kernel` works on a fresh checkout without a
@@ -23,8 +23,8 @@
 # one builder is also what makes a diff of the three Dockerfiles mean something.
 # There is no default: without a value docker refuses before any stage runs,
 # where a default would build green against an image nobody chose.
-ARG MOS_IMAGE_UBUNTU_2404
-FROM --platform=$BUILDPLATFORM ${MOS_IMAGE_UBUNTU_2404} AS toolchain
+ARG MICA_IMAGE_UBUNTU_2404
+FROM --platform=$BUILDPLATFORM ${MICA_IMAGE_UBUNTU_2404} AS toolchain
 
 ARG DEBIAN_FRONTEND=noninteractive
 # The cross compiler is the difference from the x64 builder. No device-tree
@@ -55,9 +55,9 @@ RUN set -eu; . /versions.env; \
     got="$(git -C /ksrc archive --format=tar "${KERNEL_VERSION}" | sha256sum | cut -d' ' -f1)"; \
     if [ "${KERNEL_SHA256}" = "PENDING" ]; then \
         echo "HASH linux ${KERNEL_VERSION} ${got}"; \
-        echo "error: the virt-arm64 kernel is pinned to ${KERNEL_VERSION} with no hash. Record KERNEL_SHA256=${got} in boards/virt-arm64/bsp/kernel/versions.env and run again; until then this build would compile whatever the tag points at today, which is a different fact from the source this tree agreed to ship" >&2; exit 1; \
+        echo "error: the virt-arm64 kernel is pinned to ${KERNEL_VERSION} with no hash. Record KERNEL_SHA256=${got} in bsp/kernel/versions.env and run again; until then this build would compile whatever the tag points at today, which is a different fact from the source this tree agreed to ship" >&2; exit 1; \
     elif [ "${KERNEL_SHA256}" != "${got}" ]; then \
-        echo "error: linux ${KERNEL_VERSION} hashes to ${got}, but boards/virt-arm64/bsp/kernel/versions.env pins ${KERNEL_SHA256}. Either the tag was moved upstream or the pin is stale; do not paste the new hash in without finding out which" >&2; exit 1; \
+        echo "error: linux ${KERNEL_VERSION} hashes to ${got}, but bsp/kernel/versions.env pins ${KERNEL_SHA256}. Either the tag was moved upstream or the pin is stale; do not paste the new hash in without finding out which" >&2; exit 1; \
     else \
         echo "ok linux ${KERNEL_VERSION} ${got}"; \
     fi; \
@@ -70,18 +70,18 @@ RUN set -eu; . /versions.env; \
 # refresh path.
 FROM src AS kconfig
 
-# The shared mos runtime baseline, from boards/common/ -- requires the named
+# The shared mos runtime baseline, from boot/common/ -- requires the named
 # build context: docker buildx build --build-context mos-common=../../common
-# (wired in boards/virt-arm64/bsp/Makefile; a bare build without it fails here,
+# (wired in bsp/Makefile; a bare build without it fails here,
 # loudly). Merged FIRST, so a board line that contradicted it would be the one
 # reported as the override.
 COPY --from=mos-common mos-required.fragment /mos-required.fragment
 COPY kernel/config/virt-arm64.fragment /virt-arm64.fragment
 
 # The verity content anchor, from the named build context `mos-trust`
-# (`--build-context mos-trust=../../../meta/verity`, wired in
-# boards/virt-arm64/bsp/Makefile, which mints it if it is absent). It is the
-# file boards/common/mos-required.fragment names in CONFIG_SYSTEM_TRUSTED_KEYS,
+# (`--build-context mos-trust=../meta/verity`, wired in
+# bsp/Makefile, which mints it if it is absent). It is the
+# file boot/common/mos-required.fragment names in CONFIG_SYSTEM_TRUSTED_KEYS,
 # and certs/Makefile resolves that relative path against the source tree.
 #
 # PUBLIC MATERIAL. What lands here is an X.509 certificate; the private key
@@ -142,7 +142,7 @@ COPY kernel/config/virt-arm64.config /virt-arm64.config.recorded
 # written to name the cause.
 RUN set -eu; \
     if ! diff -u /virt-arm64.config.recorded /virt-arm64.config.resolved > /tmp/config.diff; then \
-        echo "error: the resolved kernel config is not the one boards/virt-arm64/bsp/kernel/config/virt-arm64.config records. Either a fragment changed, or the pinned kernel's arm64 defconfig moved underneath it. The difference is below; review it, and if it is intended run 'make virt-arm64-kernel-config' to re-record and commit the result." >&2; \
+        echo "error: the resolved kernel config is not the one bsp/kernel/config/virt-arm64.config records. Either a fragment changed, or the pinned kernel's arm64 defconfig moved underneath it. The difference is below; review it, and if it is intended run 'make virt-arm64-kernel-config' to re-record and commit the result." >&2; \
         sed 's/^/  /' /tmp/config.diff >&2; \
         exit 1; \
     fi; \
@@ -153,13 +153,13 @@ RUN set -eu; \
 # A symbol whose dependencies are not met is dropped silently by olddefconfig,
 # so a fragment line can stop meaning anything without the build noticing.
 # Running it over the shared fragment AND the board one is what makes
-# boards/common/mos-required.fragment a floor every board holds rather than a
+# boot/common/mos-required.fragment a floor every board holds rather than a
 # floor one board asserts.
 RUN set -eu; cd /ksrc; n=0; \
     for line in $(sed -n 's/^\(CONFIG_[A-Z0-9_]*=y\)$/\1/p' /mos-required.fragment /virt-arm64.fragment); do \
         n=$((n + 1)); \
         grep -q "^${line}$" .config || { \
-            echo "error: missing required option: ${line}. It is named =y in boards/common/mos-required.fragment or boards/virt-arm64/bsp/kernel/config/virt-arm64.fragment, and olddefconfig did not keep it -- which means its dependencies are no longer met in this kernel, not that the line is optional." >&2; \
+            echo "error: missing required option: ${line}. It is named =y in boot/common/mos-required.fragment or bsp/kernel/config/virt-arm64.fragment, and olddefconfig did not keep it -- which means its dependencies are no longer met in this kernel, not that the line is optional." >&2; \
             exit 1; \
         }; \
     done; \
@@ -168,13 +168,13 @@ RUN set -eu; cd /ksrc; n=0; \
 
 # ASSERTION 3: CONFIG_LSM, which the loop above cannot see.
 #
-# It is a string, not a tristate, and boards/common/mos-required.fragment says
+# It is a string, not a tristate, and boot/common/mos-required.fragment says
 # so at the line itself: SELinux compiled in but absent from the LSM boot list
 # never registers selinuxfs, so the image ships a security module that is
 # present and inactive.
 RUN set -eu; cd /ksrc; \
     want="$(grep '^CONFIG_LSM=' /mos-required.fragment)"; \
-    [ -n "${want}" ] || { echo "error: boards/common/mos-required.fragment declares no CONFIG_LSM, so this assertion has nothing to compare and would pass over anything" >&2; exit 1; }; \
+    [ -n "${want}" ] || { echo "error: boot/common/mos-required.fragment declares no CONFIG_LSM, so this assertion has nothing to compare and would pass over anything" >&2; exit 1; }; \
     grep -q "^${want}$" .config || { \
         echo "error: the resolved config's LSM list is not the required one. Wanted ${want}, got $(grep '^CONFIG_LSM=' .config). SELinux that is compiled in but not in the boot list never registers selinuxfs, and the image ships a security module that is present and does nothing." >&2; exit 1; }; \
     echo "config: ${want}"
@@ -190,7 +190,7 @@ RUN set -eu; cd /ksrc; \
 # build context that did not arrive.
 RUN set -eu; cd /ksrc; \
     want="$(grep '^CONFIG_SYSTEM_TRUSTED_KEYS=' /mos-required.fragment)"; \
-    [ -n "${want}" ] || { echo "error: boards/common/mos-required.fragment declares no CONFIG_SYSTEM_TRUSTED_KEYS, so this assertion has nothing to compare and would pass over a kernel that trusts nothing" >&2; exit 1; }; \
+    [ -n "${want}" ] || { echo "error: boot/common/mos-required.fragment declares no CONFIG_SYSTEM_TRUSTED_KEYS, so this assertion has nothing to compare and would pass over a kernel that trusts nothing" >&2; exit 1; }; \
     grep -q "^${want}$" .config || { \
         echo "error: the resolved config's trust anchor is not the required one. Wanted ${want}, got $(grep '^CONFIG_SYSTEM_TRUSTED_KEYS=' .config)." >&2; exit 1; }; \
     path="$(printf '%s' "${want}" | sed 's/^CONFIG_SYSTEM_TRUSTED_KEYS=//; s/^"//; s/"$//')"; \
@@ -218,7 +218,7 @@ FROM gate AS build
 # explain.
 #
 # 1577836800 is 2020-01-01T00:00:00Z, the same constant
-# boards/virt-arm64/board.env pins as FILE_MTIME and E2FSPROGS_FAKE_TIME and the
+# board.env pins as FILE_MTIME and E2FSPROGS_FAKE_TIME and the
 # same one rootfs/build.sh passes as SOURCE_DATE_EPOCH. One instant across every
 # artefact this repository produces, so a timestamp anywhere in an image is
 # either that value or a defect.
@@ -231,7 +231,7 @@ FROM gate AS build
 # boards are byte-reproducible now and may be compared by sha256.
 ENV KBUILD_BUILD_TIMESTAMP="@1577836800" \
     KBUILD_BUILD_USER=mos \
-    KBUILD_BUILD_HOST=mos-build
+    KBUILD_BUILD_HOST=mica-build
 
 RUN set -eu; cd /ksrc; \
     make -j"$(nproc)" Image modules; \

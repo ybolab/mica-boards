@@ -1,5 +1,5 @@
 # virt-arm64 kernel configuration -- the board's own requirements, merged over
-# arm64's `defconfig` after boards/common/mos-required.fragment.
+# arm64's `defconfig` after boot/common/mos-required.fragment.
 #
 # THIS FILE IS THE INTENT AND THE ASSERTION LIST. Every `=y` line here is
 # asserted against the resolved `.config` after `olddefconfig`, so a symbol
@@ -15,7 +15,7 @@
 #
 # WHAT IS NOT HERE. The verity floor, the container-network floor and the
 # security/LSM baseline are board-independent and live in
-# boards/common/mos-required.fragment, which the build merges FIRST and asserts
+# boot/common/mos-required.fragment, which the build merges FIRST and asserts
 # by the same loop. A line restated here would be a second statement free to
 # disagree with the first.
 #
@@ -68,7 +68,7 @@ CONFIG_NLS_UTF8=y
 # only NIC this board ever sees is the one the harness gives it.
 CONFIG_VIRTIO_NET=y
 
-# --- the console boards/virt-arm64/board.env names --------------------------
+# --- the console board.env names --------------------------
 # BOARD_CMDLINE_ARGS is `console=ttyAMA0,115200`, one entry and no tty0,
 # because the aarch64 `virt` machine has no VGA and no framebuffer. ttyAMA0 is
 # the PL011, which is the machine's only console, so both the driver and its
@@ -130,7 +130,7 @@ CONFIG_BLOCK_LEGACY_AUTOLOAD=y
 # Everything in this block is here for one reason: the shared floor names a
 # symbol that arm64's `defconfig` leaves nothing to select. None of it is a
 # product requirement -- each is what THIS BOARD'S STARTING POINT happens to
-# leave off -- which is why it lives here and not in boards/common/, where it
+# leave off -- which is why it lives here and not in boot/common/, where it
 # would be imposed on every future board as a defconfig quirk. x64's fragment
 # carries its own version of this block for the identical reason.
 #
@@ -171,7 +171,7 @@ CONFIG_CRYPTO_SHA256=y
 CONFIG_CRYPTO_LIB_SHA256=y
 
 # --- the board half of the disk-encryption capability ------------------------
-# boards/common/mos-required.fragment carries the generic xts(aes) the crypt
+# boot/common/mos-required.fragment carries the generic xts(aes) the crypt
 # target resolves through, and says at length that it is a capability with no
 # consumer in the image. This is the ARMv8 Crypto Extensions AES that the same
 # resolution prefers when it is present, and it is the exact counterpart of
@@ -186,7 +186,7 @@ CONFIG_CRYPTO_LIB_SHA256=y
 CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
 
 # --- what virt-arm64 deliberately does NOT have ------------------------------
-# No wireless: boards/virt-arm64/board.env declares BOARD_RADIOS="" and the
+# No wireless: board.env declares BOARD_RADIOS="" and the
 # image ships no bluez, no wpasupplicant and no hostapd, so a kernel with a
 # WiFi stack would carry drivers for a userland that cannot drive them.
 # No sound, no DRM/GPU, no media, no industrial I/O, and no vendor SoC support:
