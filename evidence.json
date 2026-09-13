@@ -15,7 +15,7 @@
     },
     {
       "class": "update-negative",
-      "ref": "pkgs/mos-deploy/tests/deployments.rs and pkgs/mos-deploy/tests/acquisition.rs"
+      "ref": "pkgs/mica-deploy/tests/deployments.rs and pkgs/mica-deploy/tests/acquisition.rs"
     },
     {
       "class": "signature-negative",

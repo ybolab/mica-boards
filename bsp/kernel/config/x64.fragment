@@ -1,5 +1,5 @@
 # x64 kernel configuration -- the board's own requirements, merged over
-# `x86_64_defconfig` after boards/common/mos-required.fragment.
+# `x86_64_defconfig` after boot/common/mos-required.fragment.
 #
 # THIS FILE IS THE INTENT AND THE ASSERTION LIST. Every `=y` line here is
 # asserted against the resolved `.config` after `olddefconfig`, so a symbol
@@ -16,12 +16,12 @@
 #
 # WHAT IS NOT HERE. The verity floor, the container-network floor and the
 # security/LSM baseline are board-independent and live in
-# boards/common/mos-required.fragment, which the build merges FIRST and asserts
+# boot/common/mos-required.fragment, which the build merges FIRST and asserts
 # by the same loop. A line restated here would be a second statement free to
 # disagree with the first.
 
 # --- how the root device is found -------------------------------------------
-# The storage media is generic, exactly as boards/x64/board.env says: nvme,
+# The storage media is generic, exactly as board.env says: nvme,
 # sata or virtio, whatever the machine happens to present. All three are built
 # in because the choice is made by the machine at boot, not by this file.
 #
@@ -84,7 +84,7 @@ CONFIG_IGB=y
 CONFIG_IGC=y
 CONFIG_R8169=y
 
-# --- the consoles boards/x64/board.env names --------------------------------
+# --- the consoles board.env names --------------------------------
 # BOARD_CMDLINE_ARGS is `console=tty0 console=ttyS0,115200`, and the order is
 # load-bearing there: a machine with a screen gets kernel output on it and the
 # serial line -- the one an industrial PC is debugged through -- gets
@@ -168,7 +168,7 @@ CONFIG_BLOCK_LEGACY_AUTOLOAD=y
 # HERE AND NOT IN THE SHARED FLOOR, deliberately. This is not something the
 # product requires; it is what this board's STARTING POINT happens to leave
 # off. cx3576's vendor config has both parents set already, so putting them in
-# boards/common/ would be asserting a defconfig quirk on every future board.
+# boot/common/ would be asserting a defconfig quirk on every future board.
 CONFIG_NETFILTER=y
 CONFIG_NETFILTER_ADVANCED=y
 
@@ -181,7 +181,7 @@ CONFIG_CRYPTO_SHA256=y
 CONFIG_CRYPTO_LIB_SHA256=y
 
 # --- the board half of the disk-encryption capability ------------------------
-# boards/common/mos-required.fragment carries the generic xts(aes) the crypt
+# boot/common/mos-required.fragment carries the generic xts(aes) the crypt
 # target resolves through, and says at length that it is capability with no
 # consumer in the image. This is the x86 accelerated AES that the same
 # resolution prefers when it is present: the crypto API picks the fastest
@@ -192,7 +192,7 @@ CONFIG_CRYPTO_LIB_SHA256=y
 CONFIG_CRYPTO_AES_NI_INTEL=y
 
 # --- what x64 deliberately does NOT have ------------------------------------
-# No wireless: boards/x64/board.env declares BOARD_RADIOS="" and the image
+# No wireless: board.env declares BOARD_RADIOS="" and the image
 # ships no bluez, no wpasupplicant and no hostapd, so a kernel with a WiFi
 # stack would be carrying drivers for a userland that cannot drive them.
 # No sound, no DRM/GPU, no media, no industrial I/O: nothing in the image opens

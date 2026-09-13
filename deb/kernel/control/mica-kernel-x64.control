@@ -1,0 +1,13 @@
+Package: mica-kernel-x64
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: mos build <mos@example.invalid>
+Section: kernel
+Priority: optional
+Description: the x64 kernel, firmware and boot outputs for the assembly
+ The BSP outputs of the x64 board under /usr/lib/mica/board/x64/: the
+ kernel directory (image, config, release, modules), the firmware files and
+ component copyright the support image takes, the board definition and
+ evidence, the verity trust certificate the kernel embeds, and the signed
+ U-Boot where the board has one. Not for installation into a root: the
+ assembly reads it out of the archive.

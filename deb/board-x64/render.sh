@@ -3,14 +3,14 @@
 set -euo pipefail
 src=${1:?source root required}
 out=${2:?output directory required}
-. "$src/boards/x64/board.env"
+. "$src/board.env"
 [ "$LAYOUT_VERSION" = 3 ] && [ "$LAYOUT_PARTITIONS" = 'ESP SYSTEM DATA' ]
 mkdir -p "$out/repart.d"
 data_guid=${DATA_GUID,,}
 esp_guid=${ESP_GUID,,}
 printf -v data_line 'PARTUUID=%s /mnt/data ext4 noatime,prjquota,x-systemd.growfs 0 2' "$data_guid"
-sed "s|@DATA_LINE@|$data_line|g" "$src/rootfs/overlay/etc/fstab.in" >"$out/fstab"
-sed "s|@ESP_GUID@|$esp_guid|g" "$src/boards/x64/overlay/etc/systemd/system/boot.mount.in" >"$out/boot.mount"
+sed "s|@DATA_LINE@|$data_line|g" "$src/common/fstab.in" >"$out/fstab"
+sed "s|@ESP_GUID@|$esp_guid|g" "$src/overlay/etc/systemd/system/boot.mount.in" >"$out/boot.mount"
 # Repart 257 matches partitions by type and order; only the final DATA grows.
 for entry in ESP SYSTEM DATA; do
     var=${entry}_SIZE_MIB; size=${!var}
@@ -28,7 +28,7 @@ cat >"$out/systemd-repart.service.d/10-data.conf" <<EOF
 Before=mnt-data.mount
 [Service]
 ExecStart=
-ExecStart=/usr/lib/mos/mos-grow-data ${SYSTEM_GUID,,} ${DISK_GUID,,}
+ExecStart=/usr/lib/mica/mica-grow-data ${SYSTEM_GUID,,} ${DISK_GUID,,}
 SuccessExitStatus=
 TimeoutStartSec=30
 EOF
