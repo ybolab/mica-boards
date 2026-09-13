@@ -59,6 +59,9 @@ if [ -n "${firmware}" ]; then
     done
 fi
 [ ! -f "${REPO_ROOT}/bsp/component-copyright" ] || install -m 0644 "${REPO_ROOT}/bsp/component-copyright" "${STAGE}/component-copyright"
+# The board's build-time container switch, when it declares one: the
+# composer reads it beside board.env (rootfs/build.sh in the assembly).
+[ ! -f "${REPO_ROOT}/bsp/containers.env" ] || install -m 0644 "${REPO_ROOT}/bsp/containers.env" "${STAGE}/containers.env"
 # The signed U-Boot the image writes (bsp/Makefile uboot-mos).
 stage_tree "${OUT}/uboot-mos" "${STAGE}/uboot"
 
