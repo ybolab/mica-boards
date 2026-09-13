@@ -35,7 +35,7 @@ present "${REPO_ROOT}/board.env" "the board definition" || true
 # evidence.json is a board record some boards carry; it is staged when present
 # and its absence is not a missing input.
 
-for t in uboot uboot-package; do present "${OUT}/${t}" "run `make uboot` and `make uboot-package`" || true; done
+for t in uboot uboot-package; do present "${OUT}/${t}" "run 'make uboot' and 'make uboot-package'" || true; done
 if [ "${PREFLIGHT}" != 0 ]; then
     printf 'preflight-examined: %s\npreflight-missing: %s\npreflight-warned: %s\n' "${examined}" "${missing}" "${warned}"
     [ "${missing}" -eq 0 ]
