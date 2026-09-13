@@ -15,7 +15,7 @@ $(error boot/ is empty: the boot tooling is fetched at its pin from ybolab/mica-
 endif
 endif
 
-.PHONY: help deps deps-check deps-bump build-env kernel kernel-config uboot-mos flash-mos flash-maskrom preflight pool package-gate publish kernel-config-test mac-stable-test gadget-configfs-test flash-verify-test lint check
+.PHONY: help deps deps-check deps-bump build-env kernel kernel-config uboot-mos flash-mos flash-maskrom preflight pool package-gate publish kernel-config-test kernel-cmdline-test mac-stable-test gadget-configfs-test flash-verify-test lint check
 
 help:
 	@echo "  deps                fetch build-env/ and boot/ at their pins; deps-check reads without downloading"
@@ -82,8 +82,10 @@ gadget-configfs-test:
 	bash tests/gadget-configfs-test.sh
 flash-verify-test:
 	bash tests/cx3576-flash-verify-test.sh
+kernel-cmdline-test:
+	bash tests/kernel-cmdline-test.sh
 
 lint:
 	bash gate/shell-lint.sh
 
-check: lint kernel-config-test mac-stable-test gadget-configfs-test flash-verify-test
+check: lint kernel-config-test kernel-cmdline-test mac-stable-test gadget-configfs-test flash-verify-test
