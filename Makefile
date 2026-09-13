@@ -33,7 +33,7 @@ help:
 	@echo "                      a kernel embeds the verity trust certificate: VERITY_TRUST_CERT (default meta/verity/signer.cert.pem)"
 	@echo "  pool                every producer of every board, both architectures, indexed into _out/debs"
 	@echo "  package-gate        the package gate over that pool"
-	@echo "  publish             the pool as the GitHub Release build-<commit12> of this commit"
+	@echo "  publish             the pool as the mica-pool artifacts and every board's bundle as its mica-board artifact, tagged build-<commit12>"
 	@echo "  board-contract-test every board declares BOARD_FEATURES, BOARD_FAMILY and IMAGE_KINDS, ships manifests/ and stages them into its bundle"
 	@echo "  kernel-config-test  every board's committed kernel config carries the shared floor (boot/common/kernel-config-test.sh)"
 	@echo "  lint                shell hygiene of the tree"
@@ -86,6 +86,7 @@ package-gate:
 
 publish:
 	bash build-env/deb/publish.sh
+	bash tools/publish-boards.sh
 
 board-contract-test:
 	bash tests/board-contract-test.sh
