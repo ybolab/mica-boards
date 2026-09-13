@@ -5,4 +5,5 @@ Maintainer: mos build <mos@example.invalid>
 Section: admin
 Priority: optional
 Depends: mica-system, kmod, alsa-utils
+Conflicts: mica-board-cx3576, mica-board-virt-arm64, mica-board-x64
 Description: MOS S905X5M hardware and storage policy

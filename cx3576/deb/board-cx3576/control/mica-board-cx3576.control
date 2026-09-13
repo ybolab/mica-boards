@@ -5,6 +5,7 @@ Maintainer: mos build <mos@example.invalid>
 Section: admin
 Priority: optional
 Depends: mica-system, iproute2, kmod, mawk | awk
+Conflicts: mica-board-s905x5m, mica-board-virt-arm64, mica-board-x64
 Description: mos hardware and storage policy for CX3576-Z
  FIRMWARE/SYSTEM/DATA storage policy, board hardware initialization,
  radio configuration and status indicators. Kernel, modules, radio firmware
