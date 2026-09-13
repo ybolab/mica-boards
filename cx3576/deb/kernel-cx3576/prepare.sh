@@ -32,6 +32,7 @@ present() { examined=$((examined + 1)); [ -e "$1" ] && return 0; missing=$((miss
 for f in "${KERNEL_FILES[@]}"; do present "${OUT}/kernel/${f}" "run \`make kernel\` (an hour of compiling; not started from a packaging hook)" || true; done
 present "${TRUST_CERT}" "the verity trust certificate the kernel was built against; set VERITY_TRUST_CERT or put the signing workspace at meta/" || true
 present "${REPO_ROOT}/cx3576/board.env" "the board definition" || true
+present "${REPO_ROOT}/cx3576/manifests/board.pkgs" "the board package manifest" || true
 # evidence.json is a board record some boards carry; it is staged when present
 # and its absence is not a missing input.
 for t in uboot-mos; do present "${OUT}/${t}" "run 'make cx3576-uboot-mos'" || true; done
@@ -60,10 +61,11 @@ if [ -n "${firmware}" ]; then
     done
 fi
 [ ! -f "${REPO_ROOT}/cx3576/bsp/component-copyright" ] || install -m 0644 "${REPO_ROOT}/cx3576/bsp/component-copyright" "${STAGE}/component-copyright"
-# The board's build-time container switch, when it declares one: the
-# composer reads it beside board.env (rootfs/build.sh in the assembly).
-[ ! -f "${REPO_ROOT}/cx3576/bsp/containers.env" ] || install -m 0644 "${REPO_ROOT}/cx3576/bsp/containers.env" "${STAGE}/containers.env"
+# The board's package manifests (manifests/board.pkgs, radio-<r>.pkgs,
+# component-<c>.pkgs): the assembly's resolver reads them out of the bundle,
+# so what a board installs travels with the board.
+stage_tree "${REPO_ROOT}/cx3576/manifests" "${STAGE}/manifests"
 # The signed U-Boot the image writes (bsp/Makefile uboot-mos).
 stage_tree "${OUT}/uboot-mos" "${STAGE}/uboot"
 
-echo "prepare: staged the ${BOARD} kernel directory, board.env, evidence.json and the trust certificate into ${STAGE}"
+echo "prepare: staged the ${BOARD} kernel directory, board.env, evidence.json, manifests/ and the trust certificate into ${STAGE}"

@@ -1,4 +1,0 @@
-# kernel project context allowlist (context = bsp)
-*
-!kernel/config/
-!kernel/versions.env

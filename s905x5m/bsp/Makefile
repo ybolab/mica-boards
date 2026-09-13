@@ -1,43 +1,23 @@
-.PHONY: kernel uboot fit-tools uboot-package uboot-package-test userland
+# s905x5m: a board of the amlogic family (Amlogic S7D on the BM201, signed FIT
+# boot through U-Boot, SD boot). The kernel and U-Boot orchestration and the
+# source pins live in families/amlogic/; this file names the board, includes
+# the family's targets and keeps what is the board's own: the Bluetooth
+# bridge userland, the FIT tools image and the Amlogic recovery package.
+BOARD := s905x5m
+include ../../families/amlogic/Makefile.inc
 
-BSP_OUT ?= ../../_out/s905x5m
-FROM_SH := ../../build-env/from.sh
-UBUNTU_ARG := MICA_IMAGE_UBUNTU_2404=IMAGE_UBUNTU_2404
+.PHONY: fit-tools uboot-package uboot-package-test userland
+
 DEBIAN_ARG := MICA_IMAGE_DEBIAN_TRIXIE=IMAGE_DEBIAN_TRIXIE
 UBOOT_ARTIFACTS := $(BSP_OUT)/uboot/u-boot.bin.signed \
 	$(BSP_OUT)/uboot/u-boot.bin.sd.bin.signed \
 	$(BSP_OUT)/uboot/DDR.USB
 UBOOT_PACKAGE_DIR := $(BSP_OUT)/uboot-package
 
-VERITY_TRUST_CERT ?= ../../meta/verity/signer.cert.pem
-FIT_TRUST_CERT ?=
-VERITY_TOOL := ../../boot/verity-tool.sh
-
-kernel:
-	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(VERITY_TRUST_CERT)" "$(BSP_OUT)/verity-trust")" && \
-	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
-	docker buildx build --label ai-agent=true -t ai-agent/mos-s905x5m-kernel \
-	  --build-context mos-common=../../boot/common --build-context "mos-trust=$$TRUST_DIR" -f kernel/Dockerfile $$IMG \
-	  $(if $(KERNEL_REPO),--build-arg KERNEL_REPO=$(KERNEL_REPO)) \
-	  $(if $(KERNEL_COMMIT),--build-arg KERNEL_COMMIT=$(KERNEL_COMMIT)) \
-	  $(if $(KERNEL_EXPECT),--build-arg KERNEL_EXPECT=$(KERNEL_EXPECT)) \
-	  -o $(BSP_OUT)/kernel .
-
 userland:
 	IMG="$$(bash $(FROM_SH) $(DEBIAN_ARG))" && \
 	docker buildx build --label ai-agent=true -t ai-agent/mos-s905x5m-userland --platform linux/arm64 --target artifact \
 	  -f userland/Dockerfile $$IMG -o $(BSP_OUT)/userland userland
-
-# Only public FIT trust enters the firmware builder.
-uboot:
-	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(FIT_TRUST_CERT)" "$(BSP_OUT)/fit-trust")" && \
-	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
-	docker buildx build --label ai-agent=true -t ai-agent/mos-s905x5m-uboot \
-	  --build-context mos-common=../../boot/common --build-context "mos-boot-trust=$$TRUST_DIR" \
-	  -f uboot/Dockerfile $$IMG \
-	  $(if $(UBOOT_REPO),--build-arg UBOOT_REPO=$(UBOOT_REPO)) \
-	  $(if $(UBOOT_COMMIT),--build-arg UBOOT_COMMIT=$(UBOOT_COMMIT)) \
-	  -o $(BSP_OUT)/uboot uboot
 
 fit-tools:
 	@test -x "$(BSP_OUT)/uboot/tools/fit_check_sign"

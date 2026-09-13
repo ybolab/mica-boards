@@ -1,7 +1,0 @@
-# Kernel project context allowlist (context = BSP directory).
-*
-!kernel/config/
-!kernel/dts/
-!kernel/front-panel/
-!kernel/patches/
-!kernel/third/

@@ -62,26 +62,26 @@ RUN bash /bsp/scripts/apt-install.sh \
         device-tree-compiler swig python3-dev \
         gcc-aarch64-linux-gnu libgnutls28-dev uuid-dev
 
-ARG RKBIN_REPO=https://github.com/rockchip-linux/rkbin.git
-ARG RKBIN_COMMIT=ecb4fcbe954edf38b3ae037d5de6d9f5bccf81f4
+ARG RKBIN_REPO
+ARG RKBIN_COMMIT
 RUN bash /bsp/scripts/fetch-source.sh /rkbin "${RKBIN_REPO}" "${RKBIN_COMMIT}"
 
-ARG UBOOT_REPO=https://github.com/u-boot/u-boot.git
-ARG UBOOT_COMMIT=ece349ade2973e220f524ce59e59711cc919263f
+ARG UBOOT_REPO
+ARG UBOOT_COMMIT
 RUN bash /bsp/scripts/fetch-source.sh /uboot "${UBOOT_REPO}" "${UBOOT_COMMIT}"
 
 COPY patches/ /patches/
 RUN bash /bsp/scripts/apply-patches.sh /uboot /patches git
 
-ARG DDR_BLOB=rk3576_ddr_lp4_2112MHz_lp5_2736MHz_v1.12.bin
-ARG BL31_BLOB=rk3576_bl31_v1.24.elf
-ARG BOARD=generic-rk3576
+ARG DDR_BLOB
+ARG BL31_BLOB
+ARG UBOOT_DEFCONFIG
 COPY build.sh /bsp/uboot/build.sh
-RUN bash /bsp/uboot/build.sh /uboot /rkbin "${DDR_BLOB}" "${BL31_BLOB}" "${BOARD}_defconfig"
+RUN bash /bsp/uboot/build.sh /uboot /rkbin "${DDR_BLOB}" "${BL31_BLOB}" "${UBOOT_DEFCONFIG}"
 
 FROM build AS build-mos
-ARG DDR_BLOB=rk3576_ddr_lp4_2112MHz_lp5_2736MHz_v1.12.bin
-ARG BL31_BLOB=rk3576_bl31_v1.24.elf
+ARG DDR_BLOB
+ARG BL31_BLOB
 COPY build-mos.sh /bsp/uboot/
 COPY --from=mos-common embed-fit-trust.sh /bsp/uboot/embed-trust.sh
 COPY tests/ /bsp/uboot/tests/

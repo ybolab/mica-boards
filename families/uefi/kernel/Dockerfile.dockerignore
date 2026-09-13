@@ -1,0 +1,4 @@
+# The board's kernel directory is the context; only its inputs enter it.
+*
+!config/
+!versions.env

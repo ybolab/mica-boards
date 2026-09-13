@@ -1,0 +1,10 @@
+# The board's bsp/ directory is the context; only the kernel's inputs enter
+# it. Not kernel/tests/ (host-side), not rootfs/firmware or the bring-up
+# roots a board may keep under rootfs/ -- only the boot-logo master.
+*
+!bsp.env
+!kernel/config/
+!kernel/patches/
+!kernel/dts/
+!kernel/hooks/
+!rootfs/assets/splash.png

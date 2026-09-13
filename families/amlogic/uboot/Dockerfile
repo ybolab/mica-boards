@@ -44,8 +44,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ARG UBOOT_REPO=https://github.com/CoreELEC/u-boot.git
-ARG UBOOT_COMMIT=5f7ac2b1dc4df2f466ed88c3958a8675873f8a1a
+ARG UBOOT_REPO
+ARG UBOOT_COMMIT
 # git over HTTP/2 stalls in this image: the TLS handshake completes and the
 # stream opens, then the response never arrives and the fetch hangs for
 # minutes. HTTP/1.1 returns immediately against the same host, and apt (also

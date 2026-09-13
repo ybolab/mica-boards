@@ -1,0 +1,9 @@
+# The board's bsp/ directory is the context; only the kernel's inputs enter it.
+*
+!bsp.env
+!kernel/config/
+!kernel/dts/
+!kernel/patches/
+!kernel/hooks/
+!kernel/front-panel/
+!kernel/third/

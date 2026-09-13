@@ -21,7 +21,7 @@ endif
 
 BOARDS := x64 virt-arm64 cx3576 s905x5m
 
-.PHONY: help deps deps-check deps-bump build-env preflight pool package-gate publish kernel-config-test kernel-cmdline-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test lint check
+.PHONY: help deps deps-check deps-bump build-env preflight pool package-gate publish board-contract-test kernel-config-test kernel-cmdline-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test lint check
 
 help:
 	@echo "  deps                fetch build-env/, boot/ and debian/ at their pins; deps-check reads without downloading"
@@ -32,9 +32,10 @@ help:
 	@echo "  pool                every producer of every board, both architectures, indexed into _out/debs"
 	@echo "  package-gate        the package gate over that pool"
 	@echo "  publish             the pool as the GitHub Release build-<commit12> of this commit"
+	@echo "  board-contract-test every board declares BOARD_FEATURES, BOARD_FAMILY and IMAGE_KINDS, ships manifests/ and stages them into its bundle"
 	@echo "  kernel-config-test  every board's committed kernel config carries the shared floor (boot/common/kernel-config-test.sh)"
 	@echo "  lint                shell hygiene of the tree"
-	@echo "  check               lint, kernel-config-test and every board's own tests"
+	@echo "  check               lint, board-contract-test, kernel-config-test and every board's own tests"
 
 deps:
 	bash tools/deps.sh fetch
@@ -80,11 +81,14 @@ package-gate:
 publish:
 	bash build-env/deb/publish.sh
 
+board-contract-test:
+	bash tests/board-contract-test.sh
+
 kernel-config-test:
-	bash boot/common/kernel-config-test.sh x64 x64/bsp/kernel/config/x64.config x64/bsp/kernel/Dockerfile
-	bash boot/common/kernel-config-test.sh virt-arm64 virt-arm64/bsp/kernel/config/virt-arm64.config virt-arm64/bsp/kernel/Dockerfile
-	bash boot/common/kernel-config-test.sh cx3576 cx3576/bsp/kernel/config/kernel-cx3576z.config cx3576/bsp/kernel/configure.sh
-	bash boot/common/kernel-config-test.sh s905x5m s905x5m/bsp/kernel/config/kernel-s905x5m.config s905x5m/bsp/kernel/Dockerfile
+	bash boot/common/kernel-config-test.sh x64 x64/bsp/kernel/config/x64.config families/uefi/kernel/Dockerfile
+	bash boot/common/kernel-config-test.sh virt-arm64 virt-arm64/bsp/kernel/config/virt-arm64.config families/uefi/kernel/Dockerfile
+	bash boot/common/kernel-config-test.sh cx3576 cx3576/bsp/kernel/config/kernel-cx3576z.config families/rockchip/kernel/configure.sh
+	bash boot/common/kernel-config-test.sh s905x5m s905x5m/bsp/kernel/config/kernel-s905x5m.config families/amlogic/kernel/configure.sh
 
 kernel-cmdline-test:
 	bash cx3576/tests/kernel-cmdline-test.sh
@@ -100,4 +104,4 @@ wireless-test:
 lint:
 	bash gate/shell-lint.sh
 
-check: lint kernel-config-test kernel-cmdline-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test
+check: lint board-contract-test kernel-config-test kernel-cmdline-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test

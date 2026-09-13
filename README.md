@@ -1,9 +1,12 @@
 # mica-boards
 
 The boards of Mica OS, one directory each: `x64/`, `virt-arm64/`, `cx3576/`,
-`s905x5m/` -- the board definition (`board.env`), the BSP build (`bsp/`), the
-board packages (`deb/`), the board evidence and the board's own tests. One
-repository, standing on three source pins fetched at their commits:
+`s905x5m/` -- the board definition (`board.env`), the package manifests
+(`manifests/`), the BSP inputs (`bsp/`: configuration, device tree, patches,
+firmware, hooks), the board packages (`deb/`), the board evidence and the
+board's own tests -- and under `families/` what the boards of one SoC line
+share: the kernel and U-Boot builds and their source pins (`families/README.md`).
+One repository, standing on three source pins fetched at their commits:
 `build-env/` (`mica-build-env`), `boot/` (`mica-boot`) and `debian/`
 (`mica-debian`).
 
