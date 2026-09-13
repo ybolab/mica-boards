@@ -7,9 +7,9 @@ set -euo pipefail
 
 PREFLIGHT="${MICA_DEB_PREFLIGHT:-0}"
 for v in MICA_DEB_REPO_ROOT MICA_DEB_ARCH MICA_DEB_PRODUCER; do
-    [ -n "${!v:-}" ] || { echo "error: ${v} is not set. This script is deb/kernel/producer.env's PREPARE hook and is run by build-env/deb/build.sh, which sets it; it is not a standalone command" >&2; exit 1; }
+    [ -n "${!v:-}" ] || { echo "error: ${v} is not set. This script is deb/kernel-virt-arm64/producer.env's PREPARE hook and is run by build-env/deb/build.sh, which sets it; it is not a standalone command" >&2; exit 1; }
 done
-[ "${PREFLIGHT}" != 0 ] || [ -n "${MICA_DEB_STAGE:-}" ] || { echo "error: MICA_DEB_STAGE is not set. This script is deb/kernel/producer.env's PREPARE hook and is run by build-env/deb/build.sh, which sets it" >&2; exit 1; }
+[ "${PREFLIGHT}" != 0 ] || [ -n "${MICA_DEB_STAGE:-}" ] || { echo "error: MICA_DEB_STAGE is not set. This script is deb/kernel-virt-arm64/producer.env's PREPARE hook and is run by build-env/deb/build.sh, which sets it" >&2; exit 1; }
 
 REPO_ROOT="${MICA_DEB_REPO_ROOT}"
 STAGE="${MICA_DEB_STAGE:-}"
