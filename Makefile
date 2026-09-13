@@ -22,7 +22,7 @@ endif
 # The boards, discovered: a directory with a board.env. Nothing here names one.
 BOARDS := $(patsubst boards/%/board.env,%,$(wildcard boards/*/board.env))
 
-.PHONY: help deps deps-check deps-bump build-env preflight pool package-gate publish board-contract-test kernel-config-test kernel-cmdline-test bench-collector-test mac-stable-test can-network-test gadget-configfs-test flash-verify-test wireless-test lint check
+.PHONY: help deps deps-check deps-bump build-env preflight pool package-gate publish publish-boards-test board-contract-test kernel-config-test kernel-cmdline-test bench-collector-test mac-stable-test can-network-test gadget-configfs-test flash-verify-test wireless-test lint check
 
 help:
 	@echo "  deps                fetch build-env/ and boot/ at their pins; deps-check reads without downloading"
@@ -34,6 +34,7 @@ help:
 	@echo "  pool                every producer of every board, both architectures, indexed into _out/debs"
 	@echo "  package-gate        the package gate over that pool"
 	@echo "  publish             the pool and every board's bundle into the mica-boards package, as pool.<arch>.build-<commit12> and board.<board>.build-<commit12>"
+	@echo "  publish-boards-test tools/publish-boards.sh against a local registry container: the board tag, its identity, every refusal (docker)"
 	@echo "  board-contract-test every board declares BOARD_FEATURES, BOARD_FAMILY and IMAGE_KINDS, ships manifests/ and stages them into its bundle"
 	@echo "  kernel-config-test  every board's committed kernel config carries the shared floor (boot/common/kernel-config-test.sh)"
 	@echo "  lint                shell hygiene of the tree"
@@ -87,6 +88,9 @@ package-gate:
 publish:
 	bash build-env/deb/publish.sh
 	bash tools/publish-boards.sh
+
+publish-boards-test:
+	bash tests/publish-boards-test.sh
 
 board-contract-test:
 	bash tests/board-contract-test.sh

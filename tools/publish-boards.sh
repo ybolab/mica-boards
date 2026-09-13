@@ -43,6 +43,23 @@ trap 'rm -rf "${WORK}"' EXIT
 # The media type of a bundle file, by the directory it is under.
 kind_of() { case "$1" in board.env) echo env ;; evidence.json) echo evidence ;; manifests/*) echo manifest ;; kernel/*) echo kernel ;; uboot/*) echo uboot ;; trust/*) echo trust ;; *) echo file ;; esac; }
 
+# <manifest.json> <expect.json> <verb>: the manifest is the expected bundle --
+# artifact type, every annotation, and exactly the expected
+# (title, media type, digest) layers -- or the difference is named.
+bundle_is() {
+    local diff
+    diff="$(jq -r --slurpfile e "$2" '
+        ($e[0]) as $e
+        | {artifactType, annotations: (.annotations // {}),
+           layers: ([.layers[] | [.annotations["org.opencontainers.image.title"], .mediaType, .digest]] | sort)} as $g
+        | (if $g.artifactType != $e.artifactType then ["artifactType \($g.artifactType) (expected \($e.artifactType))"] else [] end)
+        + [($e.annotations + $g.annotations) | keys[] | select($g.annotations[.] != $e.annotations[.]) | "\(.)=\($g.annotations[.] // "(none)") (expected \($e.annotations[.] // "(none)"))"]
+        + [($g.layers - $e.layers)[] | "layer \(.[0]) \(.[1]) at \(.[2]), not in this bundle"]
+        + [($e.layers - $g.layers)[] | "no layer \(.[0]) \(.[1]) at \(.[2])"]
+        | join("; ")' "$1")" || { echo "error: ${OCI_HOST}/${artifact}:${ref} is not a manifest jq can read" >&2; return 1; }
+    [ -z "${diff}" ] || { echo "error: ${OCI_HOST}/${artifact}:${ref} $3 names another bundle: ${diff}; under one name the registry holds other bytes" >&2; return 1; }
+}
+
 published=0
 present=0
 for env in "${REPO_ROOT}"/boards/*/board.env; do
@@ -99,35 +116,38 @@ PY
         '{"org.opencontainers.image.revision": $commit, "org.opencontainers.image.created": $created, "org.opencontainers.image.source": $url,
           "mica.source-repo": $repo, "mica.source-commit": $commit, "mica.board": $board, "mica.arch": $arch, "mica.verity-cert-sha256": $cert}' >"${WORK}/${board}.annotations.json"
 
+    # What the tag must name: the kind, the identity and exactly these layers.
+    while IFS=$'\t' read -r file media title; do
+        jq -n --arg t "${title}" --arg m "${media}" --arg d "sha256:$(sha256sum "${file}" | cut -d' ' -f1)" '[$t, $m, $d]'
+    done <"${WORK}/${board}.layers.tsv" | jq -s --slurpfile ann "${WORK}/${board}.annotations.json" \
+        '{artifactType: "application/vnd.mica.board", annotations: $ann[0], layers: sort}' >"${WORK}/${board}.expect.json"
+
     artifact="$(oci_repo "${REPO_NAME}")"; ref="$(oci_tag board "${board}" "${TAG}")"
     status="$(oci_manifest_get "${artifact}" "${ref}" "${WORK}/${board}.existing.json")"
     case "${status}" in
     200)
-        while IFS=$'\t' read -r file media title; do
-            sha="sha256:$(sha256sum "${file}" | cut -d' ' -f1)"
-            have="$(jq -r --arg t "${title}" '.layers[] | select(.annotations["org.opencontainers.image.title"] == $t) | .digest' "${WORK}/${board}.existing.json")"
-            [ "${have}" = "${sha}" ] || { echo "error: ${OCI_HOST}/${artifact}:${ref} exists and carries ${title} at ${have:-nothing}, and this bundle has ${sha}; under one name the registry holds other bytes" >&2; exit 1; }
-        done <"${WORK}/${board}.layers.tsv"
+        bundle_is "${WORK}/${board}.existing.json" "${WORK}/${board}.expect.json" "exists and" || exit 1
+        pushed=""
         present=$((present + 1))
         echo "publish-boards.sh: ${OCI_HOST}/${artifact}:${ref} exists with this bundle"
         ;;
     404)
-        digest="$(oci_push "${artifact}" "${ref}" application/vnd.mica.board "${WORK}/${board}.annotations.json" "${WORK}/${board}.layers.tsv")" || exit 1
+        pushed="$(oci_push "${artifact}" "${ref}" application/vnd.mica.board "${WORK}/${board}.annotations.json" "${WORK}/${board}.layers.tsv")" || exit 1
         published=$((published + 1))
-        echo "publish-boards.sh: ${board} (${arch}, $(wc -l <"${WORK}/${board}.layers.tsv") layers) pushed as ${OCI_HOST}/${artifact}:${ref} (${digest})"
+        echo "publish-boards.sh: ${board} (${arch}, $(wc -l <"${WORK}/${board}.layers.tsv") layers) pushed as ${OCI_HOST}/${artifact}:${ref} (${pushed})"
         ;;
     401 | 403) echo "error: the registry answered ${status} for ${OCI_HOST}/${artifact}; ${MICA_RELEASE_TOKEN_VAR} does not grant access" >&2; exit 1 ;;
     000) echo "error: ${OCI_HOST} could not be reached (transport failure)" >&2; exit 1 ;;
     *) echo "error: reading ${OCI_HOST}/${artifact}:${ref} answered HTTP ${status}" >&2; exit 1 ;;
     esac
-    # Read back: the manifest by tag resolves to what was pushed, every layer at its digest.
+    # Read back: anonymously readable, the tag resolves to what was pushed,
+    # and it names this bundle -- an upload that answered 201 is not yet a publication.
     oci_require_public "${artifact}" "${ref}" || exit 1
     status="$(oci_manifest_get "${artifact}" "${ref}" "${WORK}/${board}.back.json")"
     [ "${status}" = 200 ] || { echo "error: reading ${OCI_HOST}/${artifact}:${ref} back answered HTTP ${status}" >&2; exit 1; }
-    while IFS=$'\t' read -r file media title; do
-        sha="sha256:$(sha256sum "${file}" | cut -d' ' -f1)"
-        [ "$(jq -r --arg t "${title}" '.layers[] | select(.annotations["org.opencontainers.image.title"] == $t) | .digest' "${WORK}/${board}.back.json")" = "${sha}" ] || { echo "error: ${OCI_HOST}/${artifact}:${ref} serves ${title} at another digest than ${sha}" >&2; exit 1; }
-    done <"${WORK}/${board}.layers.tsv"
-    echo "publish-boards.sh: ${board}: ${OCI_HOST}/${artifact}:${ref} $(oci_manifest_digest "${WORK}/${board}.back.json")"
+    back="$(oci_manifest_digest "${WORK}/${board}.back.json")"
+    [ -z "${pushed}" ] || [ "${back}" = "${pushed}" ] || { echo "error: ${OCI_HOST}/${artifact}:${ref} resolves to ${back}, and ${pushed} was pushed" >&2; exit 1; }
+    bundle_is "${WORK}/${board}.back.json" "${WORK}/${board}.expect.json" "serves" || exit 1
+    echo "publish-boards.sh: ${board}: ${OCI_HOST}/${artifact}:${ref} ${back}"
 done
 echo "publish-boards.sh: ${published} board(s) pushed, ${present} already present"
