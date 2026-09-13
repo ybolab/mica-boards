@@ -5,7 +5,7 @@
 #
 #   reads   _out/debs/<arch>/pool/mica-kernel-<board>_*.deb   (the bundle, packed by the kernel producer)
 #           <board>/board.env                                  (which boards, and each one's architecture)
-#   writes  <registry>/mica-board/<board>:build-<commit12>, one layer per bundle
+#   writes  <registry>/mica-board:<board>.build-<commit12>, one layer per bundle
 #           file (application/vnd.mica.board.<kind>, titled with the file's
 #           path under the bundle), annotated mica.board, mica.arch,
 #           mica.verity-cert-sha256, mica.source-commit
@@ -94,38 +94,39 @@ PY
         printf '%s\t%s\t%s\n' "${stage}/${f}" "application/vnd.mica.board.$(kind_of "${f}")" "${f}" >>"${WORK}/${board}.layers.tsv"
     done < <(cd "${stage}" && find . -type f -printf '%P\n' | LC_ALL=C sort)
     cert_sha="$(sha256sum "${stage}/trust/verity-signer.cert.pem" | cut -d' ' -f1)"
-    jq -n --arg repo "${REPO_NAME}" --arg commit "${HEAD_COMMIT}" --arg created "${HEAD_CREATED}" --arg board "${board}" --arg arch "${arch}" --arg cert "${cert_sha}" \
-        '{"org.opencontainers.image.revision": $commit, "org.opencontainers.image.created": $created, "org.opencontainers.image.source": $repo,
+    jq -n --arg url "${MICA_SOURCE_URL%/}/${REPO_NAME}" --arg repo "${REPO_NAME}" --arg commit "${HEAD_COMMIT}" --arg created "${HEAD_CREATED}" --arg board "${board}" --arg arch "${arch}" --arg cert "${cert_sha}" \
+        '{"org.opencontainers.image.revision": $commit, "org.opencontainers.image.created": $created, "org.opencontainers.image.source": $url,
           "mica.source-repo": $repo, "mica.source-commit": $commit, "mica.board": $board, "mica.arch": $arch, "mica.verity-cert-sha256": $cert}' >"${WORK}/${board}.annotations.json"
 
-    artifact="$(oci_repo board "${board}")"
-    status="$(oci_manifest_get "${artifact}" "${TAG}" "${WORK}/${board}.existing.json")"
+    artifact="$(oci_repo board)"; ref="$(oci_tag "${board}" "${TAG}")"
+    status="$(oci_manifest_get "${artifact}" "${ref}" "${WORK}/${board}.existing.json")"
     case "${status}" in
     200)
         while IFS=$'\t' read -r file media title; do
             sha="sha256:$(sha256sum "${file}" | cut -d' ' -f1)"
             have="$(jq -r --arg t "${title}" '.layers[] | select(.annotations["org.opencontainers.image.title"] == $t) | .digest' "${WORK}/${board}.existing.json")"
-            [ "${have}" = "${sha}" ] || { echo "error: ${OCI_HOST}/${artifact}:${TAG} exists and carries ${title} at ${have:-nothing}, and this bundle has ${sha}; under one name the registry holds other bytes" >&2; exit 1; }
+            [ "${have}" = "${sha}" ] || { echo "error: ${OCI_HOST}/${artifact}:${ref} exists and carries ${title} at ${have:-nothing}, and this bundle has ${sha}; under one name the registry holds other bytes" >&2; exit 1; }
         done <"${WORK}/${board}.layers.tsv"
         present=$((present + 1))
-        echo "publish-boards.sh: ${OCI_HOST}/${artifact}:${TAG} exists with this bundle"
+        echo "publish-boards.sh: ${OCI_HOST}/${artifact}:${ref} exists with this bundle"
         ;;
     404)
-        digest="$(oci_push "${artifact}" "${TAG}" application/vnd.mica.board "${WORK}/${board}.annotations.json" "${WORK}/${board}.layers.tsv")" || exit 1
+        digest="$(oci_push "${artifact}" "${ref}" application/vnd.mica.board "${WORK}/${board}.annotations.json" "${WORK}/${board}.layers.tsv")" || exit 1
         published=$((published + 1))
-        echo "publish-boards.sh: ${board} (${arch}, $(wc -l <"${WORK}/${board}.layers.tsv") layers) pushed as ${OCI_HOST}/${artifact}:${TAG} (${digest})"
+        echo "publish-boards.sh: ${board} (${arch}, $(wc -l <"${WORK}/${board}.layers.tsv") layers) pushed as ${OCI_HOST}/${artifact}:${ref} (${digest})"
         ;;
     401 | 403) echo "error: the registry answered ${status} for ${OCI_HOST}/${artifact}; ${MICA_RELEASE_TOKEN_VAR} does not grant access" >&2; exit 1 ;;
     000) echo "error: ${OCI_HOST} could not be reached (transport failure)" >&2; exit 1 ;;
-    *) echo "error: reading ${OCI_HOST}/${artifact}:${TAG} answered HTTP ${status}" >&2; exit 1 ;;
+    *) echo "error: reading ${OCI_HOST}/${artifact}:${ref} answered HTTP ${status}" >&2; exit 1 ;;
     esac
     # Read back: the manifest by tag resolves to what was pushed, every layer at its digest.
-    status="$(oci_manifest_get "${artifact}" "${TAG}" "${WORK}/${board}.back.json")"
-    [ "${status}" = 200 ] || { echo "error: reading ${OCI_HOST}/${artifact}:${TAG} back answered HTTP ${status}" >&2; exit 1; }
+    oci_require_public "${artifact}" "${ref}" || exit 1
+    status="$(oci_manifest_get "${artifact}" "${ref}" "${WORK}/${board}.back.json")"
+    [ "${status}" = 200 ] || { echo "error: reading ${OCI_HOST}/${artifact}:${ref} back answered HTTP ${status}" >&2; exit 1; }
     while IFS=$'\t' read -r file media title; do
         sha="sha256:$(sha256sum "${file}" | cut -d' ' -f1)"
-        [ "$(jq -r --arg t "${title}" '.layers[] | select(.annotations["org.opencontainers.image.title"] == $t) | .digest' "${WORK}/${board}.back.json")" = "${sha}" ] || { echo "error: ${OCI_HOST}/${artifact}:${TAG} serves ${title} at another digest than ${sha}" >&2; exit 1; }
+        [ "$(jq -r --arg t "${title}" '.layers[] | select(.annotations["org.opencontainers.image.title"] == $t) | .digest' "${WORK}/${board}.back.json")" = "${sha}" ] || { echo "error: ${OCI_HOST}/${artifact}:${ref} serves ${title} at another digest than ${sha}" >&2; exit 1; }
     done <"${WORK}/${board}.layers.tsv"
-    echo "publish-boards.sh: ${board}: ${OCI_HOST}/${artifact}:${TAG} $(oci_manifest_digest "${WORK}/${board}.back.json")"
+    echo "publish-boards.sh: ${board}: ${OCI_HOST}/${artifact}:${ref} $(oci_manifest_digest "${WORK}/${board}.back.json")"
 done
 echo "publish-boards.sh: ${published} board(s) pushed, ${present} already present"
