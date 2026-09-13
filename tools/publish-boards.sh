@@ -5,7 +5,8 @@
 #
 #   reads   _out/debs/<arch>/pool/mica-kernel-<board>_*.deb   (the bundle, packed by the kernel producer)
 #           <board>/board.env                                  (which boards, and each one's architecture)
-#   writes  <registry>/mica-board:<board>.build-<commit12>, one layer per bundle
+#   writes  <registry>/mica-boards:board.<board>.build-<commit12> (the package is
+#           this repository, so its own CI token owns it), one layer per bundle
 #           file (application/vnd.mica.board.<kind>, titled with the file's
 #           path under the bundle), annotated mica.board, mica.arch,
 #           mica.verity-cert-sha256, mica.source-commit
@@ -98,7 +99,7 @@ PY
         '{"org.opencontainers.image.revision": $commit, "org.opencontainers.image.created": $created, "org.opencontainers.image.source": $url,
           "mica.source-repo": $repo, "mica.source-commit": $commit, "mica.board": $board, "mica.arch": $arch, "mica.verity-cert-sha256": $cert}' >"${WORK}/${board}.annotations.json"
 
-    artifact="$(oci_repo board)"; ref="$(oci_tag "${board}" "${TAG}")"
+    artifact="$(oci_repo "${REPO_NAME}")"; ref="$(oci_tag board "${board}" "${TAG}")"
     status="$(oci_manifest_get "${artifact}" "${ref}" "${WORK}/${board}.existing.json")"
     case "${status}" in
     200)
