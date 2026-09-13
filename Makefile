@@ -18,7 +18,7 @@ endif
 .PHONY: help deps deps-check deps-bump build-env kernel kernel-config uboot userland fit-tools uboot-package uboot-package-test preflight pool package-gate publish kernel-config-test wireless-test lint check
 
 help:
-	@echo "  deps                fetch build-env/ and boot/ at their pins; deps-check reads without downloading"
+	@echo "  deps                fetch build-env/, boot/ and debian/ at their pins; deps-check reads without downloading"
 	@echo "  deps-bump           DEP=mica-build-env|mica-boot [DEP_TAG=build-<commit12>] rewrites one pin"
 	@echo "  build-env           the builder images, from the pins in build-env/images.env"
 	@echo "  kernel              the board kernel into _out/bsp/kernel (VERITY_TRUST_CERT names the trust certificate it embeds; default meta/verity/signer.cert.pem)"

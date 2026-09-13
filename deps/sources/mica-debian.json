@@ -1,0 +1,8 @@
+{
+  "name": "mica-debian",
+  "repository": "mica-debian",
+  "commit": "8a3ef0d1e67a6d2c3f529f08e517f9595548c53f",
+  "path": "debian",
+  "asset": "mica-debian-8a3ef0d1e67a.tar.gz",
+  "sha256": "1ea7ee7c119468f5cfba4075b12aecf6e747440263b10c065a6988f0efc99e32"
+}
