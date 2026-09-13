@@ -13,9 +13,11 @@
 #     "asset": "mica-build-env-<commit12>.tar.gz", "sha256": "<64 hex>" }
 #
 # The asset is the `git archive` of that commit, the one layer of the OCI
-# artifact <registry>/mica-source/<repository>:build-<commit12> (pushed by
-# the repository's workflow, or by `publish-source` from a developer
-# machine); its sha256 is the layer's digest. `fetch` reads the blob by that
+# artifact <registry>/<repository>:source.build-<commit12>, in the package of
+# the repository itself, pushed by its own CI (`publish-source`); its sha256
+# is the layer's digest. A pin that predates per-repository packages names a
+# blob of <registry>/mica-source (tagged <repository>.build-<commit12>), and
+# fetch and bump still find it there. `fetch` reads the blob by that
 # digest, verifies it, replaces <path> with its contents and records the pin
 # in <path>/.deps-pin, so a second fetch is a no-op and the lineage record
 # can require the checkout to match the pin. <path> is gitignored: what is
@@ -62,9 +64,58 @@ oci_load() { # from MICA_REGISTRY (and MICA_REGISTRY_PLAIN_HTTP=1 for a test reg
     fi
 }
 
-oci_repo() { # <kind> <path...>
-    local kind="$1"; shift
-    printf '%s/mica-%s/%s\n' "${OCI_BASE}" "${kind}" "$(IFS=/; printf '%s' "$*")"
+oci_repo() { # <repository>
+    [[ "$1" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "error: '$1' is not a repository name a package can carry ([a-z0-9-])" >&2; return 1; }
+    printf '%s/%s\n' "${OCI_BASE}" "$1"
+}
+
+oci_legacy_repo() { # <kind>
+    printf '%s/mica-%s\n' "${OCI_BASE}" "$1"
+}
+
+oci_tag() { # <name>... <build-tag>
+    local IFS=.
+    printf '%s\n' "$*"
+}
+
+# The newest build-<commit12> published under <prefix>, by the created
+# annotation of each manifest (a tag carries no date); empty when none.
+oci_newest() { # <repo> <prefix>
+    local repo="$1" prefix="$2" tag out best="" best_created="" created
+    out="$(mktemp)"
+    while IFS= read -r tag; do
+        case "${tag}" in "${prefix}".build-*) ;; *) continue ;; esac
+        [[ "${tag#"${prefix}".}" =~ ^build-[0-9a-f]{12}$ ]] || continue
+        [ "$(oci_manifest_get "${repo}" "${tag}" "${out}")" = 200 ] || continue
+        created="$(jq -r '.annotations["org.opencontainers.image.created"] // empty' "${out}")"
+        [ -n "${created}" ] || continue
+        if [ -z "${best}" ] || [[ "${created}" > "${best_created}" ]]; then best="${tag#"${prefix}".}"; best_created="${created}"; fi
+    done < <(oci_tags "${repo}")
+    rm -f "${out}"
+    printf '%s' "${best}"
+}
+
+# Whether <repo>:<ref> is readable with no credential at all: the anonymous
+# token the realm issues, then the manifest. Every publisher runs it after a
+# push, so an artifact that went out private is a red job naming the package
+# to make public, not a consumer's 401 a week later.
+oci_public() { # <repo> <ref>
+    local repo="$1" ref="$2" challenge realm service t auth=()
+    challenge="$(curl -sS --max-time 60 -o /dev/null -D - "${OCI_URL}/v2/${repo}/tags/list" 2>/dev/null | tr -d '\r' | grep -i '^www-authenticate: bearer' || true)"
+    if [ -n "${challenge}" ]; then
+        realm="$(printf '%s' "${challenge}" | sed -n 's/.*realm="\([^"]*\)".*/\1/p')"
+        service="$(printf '%s' "${challenge}" | sed -n 's/.*service="\([^"]*\)".*/\1/p')"
+        t="$(curl -sS --max-time 60 --get --data-urlencode "service=${service}" --data-urlencode "scope=repository:${repo}:pull" "${realm}" 2>/dev/null | jq -r '.token // .access_token // empty' 2>/dev/null || true)"
+        [ -z "${t}" ] || auth=(-H "Authorization: Bearer ${t}")
+    fi
+    [ "$(curl -sS --max-time 60 -o /dev/null -w '%{http_code}' "${auth[@]}" -H "Accept: ${OCI_MANIFEST_TYPE}" "${OCI_URL}/v2/${repo}/manifests/${ref}" 2>/dev/null || echo 000)" = 200 ]
+}
+
+# The refusal a publisher prints when its artifact is not public.
+oci_require_public() { # <repo> <ref>
+    oci_public "$1" "$2" && return 0
+    echo "error: ${OCI_HOST}/$1:$2 was published and cannot be pulled anonymously: the package $1 is private. Every Mica OS package is public; set it once at https://github.com/orgs/${OCI_BASE}/packages/container/package/${1#"${OCI_BASE}"/} (Package settings, Danger Zone, Change visibility: Public) and rerun -- every later artifact of this repository is public from then on" >&2
+    return 1
 }
 
 # A bearer for <repo> with <actions> (pull | pull,push), from the challenge
@@ -106,6 +157,19 @@ oci_blob_get() { # <repo> <digest> <out> -> status; the storage redirect is foll
 }
 oci_blob_head() { # <repo> <digest> -> status
     oci_request HEAD "$1" pull "blobs/$2" /dev/null -I
+}
+# Which of <repo>... holds <digest>, in order: "<status> TAB <repo>", the
+# first 200, else the last status other than 404 (or 404) and no repository.
+# Safe across packages because the digest is the content.
+oci_blob_where() { # <digest> <repo>...
+    local digest="$1" repo status last=404
+    shift
+    for repo in "$@"; do
+        status="$(oci_blob_head "${repo}" "${digest}")" || status=000
+        [ "${status}" != 200 ] || { printf '200\t%s\n' "${repo}"; return 0; }
+        [ "${status}" = 404 ] || last="${status}"
+    done
+    printf '%s\t\n' "${last}"
 }
 oci_tags() { # <repo>: every tag, one per line; empty (status 404) for a repository nobody pushed
     local repo="$1" out status last="" page
@@ -192,7 +256,12 @@ explain() { # status what
     000) die "$2: ${OCI_HOST} could not be reached (transport failure)" ;;
     esac
 }
-source_repo() { oci_repo source "$1"; }
+# One repository's source at one commit: <owner>/<repository>:source.build-<commit12>,
+# and where it was before per-repository packages: <owner>/mica-source:<repository>.build-<commit12>.
+source_repo() { oci_repo "$1"; } # <repository>
+source_ref() { oci_tag source "$1"; } # <build-tag>
+legacy_source_repo() { oci_legacy_repo source; }
+legacy_source_ref() { oci_tag "$1" "$2"; } # <repository> <build-tag>
 pin_fields() { # file -> name repository commit path asset sha256 (validated)
     jq -e 'type == "object" and (keys | sort == ["asset","commit","name","path","repository","sha256"])
         and (.name | test("^[A-Za-z0-9][A-Za-z0-9._-]*$")) and (.repository | test("^[A-Za-z0-9][A-Za-z0-9._-]*$"))
@@ -202,22 +271,6 @@ pin_fields() { # file -> name repository commit path asset sha256 (validated)
         die "$1 is not a source pin: an object with exactly name, repository, commit (40 hex), path (relative), asset (*.tar.gz) and sha256 (64 hex)"
     jq -r '[.name, .repository, .commit, .path, .asset, .sha256] | @tsv' "$1"
 }
-# The newest build-<commit12> tag of a repository, by the created annotation
-# of each tag's manifest (a tag carries no date); empty when there is none.
-newest_source_tag() { # <repo>
-    local repo="$1" tag out best="" best_created="" created
-    out="$(mktemp)"
-    while IFS= read -r tag; do
-        [[ "${tag}" =~ ^build-[0-9a-f]{12}$ ]] || continue
-        [ "$(oci_manifest_get "${repo}" "${tag}" "${out}")" = 200 ] || continue
-        created="$(jq -r '.annotations["org.opencontainers.image.created"] // empty' "${out}")"
-        [ -n "${created}" ] || continue
-        if [ -z "${best}" ] || [[ "${created}" > "${best_created}" ]]; then best="${tag}"; best_created="${created}"; fi
-    done < <(oci_tags "${repo}")
-    rm -f "${out}"
-    printf '%s' "${best}"
-}
-
 cmd_fetch() {
     local check=0
     [ "${1:-}" != --check ] || check=1
@@ -228,22 +281,23 @@ cmd_fetch() {
     local work; work="$(mktemp -d)"; trap 'rm -rf "${work}"' RETURN
     for f in "${files[@]}"; do
         IFS=$'\t' read -r name repository commit path asset sha < <(pin_fields "${f}")
-        local dest="${REPO_ROOT}/${path}" tag="build-${commit:0:12}" repo status
-        repo="$(source_repo "${repository}")"
+        local dest="${REPO_ROOT}/${path}" tag="build-${commit:0:12}" repo status own
+        own="$(source_repo "${repository}")" || exit 1
         if [ "${check}" = 0 ] && [ -f "${dest}/.deps-pin" ] && [ "$(cat "${dest}/.deps-pin")" = "${sha}" ]; then
             echo "deps.sh: ${path}/ is ${name} at ${commit:0:12} already"
             continue
         fi
+        # The repository's own package, else the shared one the pin predates.
+        IFS=$'\t' read -r status repo < <(oci_blob_where "sha256:${sha}" "${own}" "$(legacy_source_repo)")
+        explain "${status}" "reading ${OCI_HOST}/${own}"
+        [ "${status}" = 200 ] || die "${OCI_HOST}/${own} holds no blob sha256:${sha} (HTTP ${status}), nor does ${OCI_HOST}/$(legacy_source_repo); the pin ${f#"${REPO_ROOT}"/} names a commit ${repository} never published as $(source_ref "${tag}")"
         if [ "${check}" = 1 ]; then
-            status="$(oci_blob_head "${repo}" "sha256:${sha}")"
-            explain "${status}" "reading ${OCI_HOST}/${repo}"
-            [ "${status}" = 200 ] || die "${OCI_HOST}/${repo} holds no blob sha256:${sha} (HTTP ${status}); the pin ${f#"${REPO_ROOT}"/} names a commit ${repository} never published as ${tag}"
             echo "deps.sh: ${name} at ${commit:0:12} is published (${OCI_HOST}/${repo}@sha256:${sha:0:12})"
             continue
         fi
         status="$(oci_blob_get "${repo}" "sha256:${sha}" "${work}/${asset}")"
         explain "${status}" "downloading ${asset}"
-        [ "${status}" = 200 ] || die "${OCI_HOST}/${repo} holds no blob sha256:${sha} (HTTP ${status}); the pin ${f#"${REPO_ROOT}"/} names a commit ${repository} never published as ${tag}"
+        [ "${status}" = 200 ] || die "downloading ${asset} from ${OCI_HOST}/${repo} answered HTTP ${status}"
         local got; got="$(sha256sum "${work}/${asset}" | cut -d' ' -f1)"
         [ "${got}" = "${sha}" ] || die "${name}: ${asset} hashes to ${got}, and the pin says ${sha}; the download was discarded"
         rm -rf "${work}/tree"; mkdir -p "${work}/tree"
@@ -274,21 +328,36 @@ cmd_bump() {
     fi
     token
     local work; work="$(mktemp -d)"; trap 'rm -rf "${work}"' RETURN
-    local repo status; repo="$(source_repo "${repository}")"
+    local repo status ref own; own="$(source_repo "${repository}")" || exit 1
+    # The repository's own package; else, for a repository that has not
+    # published there yet, the shared package of before.
+    repo="${own}"
     if [ -z "${tag}" ]; then
-        tag="$(newest_source_tag "${repo}")" || exit 1
-        [ -n "${tag}" ] || die "${OCI_HOST}/${repo} has no build-<commit12> artifact"
+        tag="$(oci_newest "${own}" source)" || exit 1
+        if [ -z "${tag}" ]; then
+            repo="$(legacy_source_repo)"
+            tag="$(oci_newest "${repo}" "${repository}")" || exit 1
+        fi
+        [ -n "${tag}" ] || die "${OCI_HOST}/${own} has no source.build-<commit12> artifact (nor ${OCI_HOST}/$(legacy_source_repo) a ${repository}.build-<commit12>)"
     fi
     [[ "${tag}" =~ ^build-[0-9a-f]{12}$ ]] || die "the tag '${tag}' is not build-<commit12>"
-    status="$(oci_manifest_get "${repo}" "${tag}" "${work}/manifest.json")"
-    explain "${status}" "reading ${OCI_HOST}/${repo}:${tag}"
-    [ "${status}" = 200 ] || die "${OCI_HOST}/${repo} has no artifact tagged ${tag} (HTTP ${status})"
+    ref="$(source_ref "${tag}")"
+    [ "${repo}" = "${own}" ] || ref="$(legacy_source_ref "${repository}" "${tag}")"
+    status="$(oci_manifest_get "${repo}" "${ref}" "${work}/manifest.json")"
+    if [ "${status}" = 404 ] && [ "${repo}" = "${own}" ]; then
+        repo="$(legacy_source_repo)"; ref="$(legacy_source_ref "${repository}" "${tag}")"
+        status="$(oci_manifest_get "${repo}" "${ref}" "${work}/manifest.json")"
+    fi
+    explain "${status}" "reading ${OCI_HOST}/${repo}:${ref}"
+    [ "${status}" = 200 ] || die "${OCI_HOST}/${own} has no artifact $(source_ref "${tag}") (HTTP ${status}), nor ${OCI_HOST}/$(legacy_source_repo) a $(legacy_source_ref "${repository}" "${tag}")"
     local commit asset digest
+    [ "$(jq -r '.artifactType // empty' "${work}/manifest.json")" = application/vnd.mica.source ] || die "${OCI_HOST}/${repo}:${ref} is a '$(jq -r '.artifactType // "(none)"' "${work}/manifest.json")' artifact, not application/vnd.mica.source"
+    [ "$(jq -r '.annotations["mica.source-repo"] // empty' "${work}/manifest.json")" = "${repository}" ] || die "${OCI_HOST}/${repo}:${ref} says mica.source-repo='$(jq -r '.annotations["mica.source-repo"] // ""' "${work}/manifest.json")', not ${repository}; a package holds only its own repository's artifacts"
     commit="$(jq -r '.annotations["org.opencontainers.image.revision"] // empty' "${work}/manifest.json")"
-    [ "$(jq -r '.layers | length' "${work}/manifest.json")" = 1 ] || die "${OCI_HOST}/${repo}:${tag} carries $(jq -r '.layers | length' "${work}/manifest.json") layers; a source artifact is one tarball"
+    [ "$(jq -r '.layers | length' "${work}/manifest.json")" = 1 ] && [ "$(jq -r '.layers[0].mediaType' "${work}/manifest.json")" = application/vnd.mica.source.tar+gzip ] || die "${OCI_HOST}/${repo}:${ref} carries $(jq -r '.layers | length' "${work}/manifest.json") layer(s) of $(jq -r '[.layers[].mediaType] | unique | join(",")' "${work}/manifest.json"); a source artifact is one application/vnd.mica.source.tar+gzip"
     asset="$(jq -r '.layers[0].annotations["org.opencontainers.image.title"] // empty' "${work}/manifest.json")"
     digest="$(jq -r '.layers[0].digest' "${work}/manifest.json")"
-    [ "${asset}" = "${repository}-${tag#build-}.tar.gz" ] || die "${OCI_HOST}/${repo}:${tag} carries '${asset}', not ${repository}-${tag#build-}.tar.gz"
+    [ "${asset}" = "${repository}-${tag#build-}.tar.gz" ] || die "${OCI_HOST}/${repo}:${ref} carries '${asset}', not ${repository}-${tag#build-}.tar.gz"
     [[ "${commit}" =~ ^[0-9a-f]{40}$ ]] && [ "${commit:0:12}" = "${tag#build-}" ] || die "the artifact ${tag} says it was built from '${commit}', which does not name the commit in its tag"
     status="$(oci_blob_get "${repo}" "${digest}" "${work}/${asset}")"
     [ "${status}" = 200 ] || die "downloading ${asset} answered HTTP ${status}"
@@ -319,33 +388,35 @@ cmd_publish_source() {
         [ -n "${origin_url}" ] && [ -n "${repository}" ] || die "${REPO_ROOT} has no origin remote; set MICA_SOURCE_REPO=<name>"
     fi
     [ -z "$(git -C "${REPO_ROOT}" status --porcelain)" ] || die "${REPO_ROOT} has uncommitted changes; a source artifact is one commit's tree"
-    local commit tag asset created repo
+    local commit tag asset created repo ref
     commit="$(git -C "${REPO_ROOT}" rev-parse HEAD)"; tag="build-${commit:0:12}"; asset="${repository}-${commit:0:12}.tar.gz"
     created="$(git -C "${REPO_ROOT}" show -s --format=%cI HEAD)"
-    repo="$(source_repo "${repository}")"
+    repo="$(source_repo "${repository}")" || exit 1; ref="$(source_ref "${tag}")"
     token --write
     local work; work="$(mktemp -d)"; trap 'rm -rf "${work}"' RETURN
     git -C "${REPO_ROOT}" archive --format=tar.gz --prefix="${repository}-${commit:0:12}/" -o "${work}/${asset}" HEAD
     local sha; sha="$(sha256sum "${work}/${asset}" | cut -d' ' -f1)"
     local status
-    status="$(oci_manifest_get "${repo}" "${tag}" "${work}/existing.json")"
-    explain "${status}" "reading ${OCI_HOST}/${repo}:${tag}"
+    status="$(oci_manifest_get "${repo}" "${ref}" "${work}/existing.json")"
+    explain "${status}" "reading ${OCI_HOST}/${repo}:${ref}"
     if [ "${status}" = 200 ]; then
         local have; have="$(jq -r '.layers[0].digest // empty' "${work}/existing.json")"
-        [ "${have}" = "sha256:${sha}" ] || die "${OCI_HOST}/${repo}:${tag} exists with ${have:-no layer}, and this tree's archive is sha256:${sha}; under one name the registry holds other bytes"
-        echo "deps.sh: ${asset} is already ${OCI_HOST}/${repo}:${tag}; comparing bytes"
+        [ "${have}" = "sha256:${sha}" ] || die "${OCI_HOST}/${repo}:${ref} exists with ${have:-no layer}, and this tree's archive is sha256:${sha}; under one name the registry holds other bytes"
+        echo "deps.sh: ${asset} is already ${OCI_HOST}/${repo}:${ref}; comparing bytes"
     elif [ "${status}" = 404 ]; then
         jq -n --arg repo "${repository}" --arg commit "${commit}" --arg created "${created}" \
-            '{"org.opencontainers.image.revision": $commit, "org.opencontainers.image.created": $created, "org.opencontainers.image.source": $repo, "mica.source-repo": $repo, "mica.source-commit": $commit}' >"${work}/annotations.json"
+            --arg url "https://github.com/${OCI_BASE}/${repository}" \
+            '{"org.opencontainers.image.revision": $commit, "org.opencontainers.image.created": $created, "org.opencontainers.image.source": $url, "mica.source-repo": $repo, "mica.source-commit": $commit}' >"${work}/annotations.json"
         printf '%s\t%s\t%s\n' "${work}/${asset}" application/vnd.mica.source.tar+gzip "${asset}" >"${work}/layers.tsv"
-        local digest; digest="$(oci_push "${repo}" "${tag}" application/vnd.mica.source "${work}/annotations.json" "${work}/layers.tsv")" || exit 1
-        echo "deps.sh: ${asset} pushed as ${OCI_HOST}/${repo}:${tag} (${digest})"
-    else die "reading ${OCI_HOST}/${repo}:${tag} answered HTTP ${status}"; fi
+        local digest; digest="$(oci_push "${repo}" "${ref}" application/vnd.mica.source "${work}/annotations.json" "${work}/layers.tsv")" || exit 1
+        echo "deps.sh: ${asset} pushed as ${OCI_HOST}/${repo}:${ref} (${digest})"
+    else die "reading ${OCI_HOST}/${repo}:${ref} answered HTTP ${status}"; fi
+    oci_require_public "${repo}" "${ref}" || exit 1
     status="$(oci_blob_get "${repo}" "sha256:${sha}" "${work}/back.tar.gz")"
     [ "${status}" = 200 ] || die "reading ${asset} back answered HTTP ${status}"
     local got; got="$(sha256sum "${work}/back.tar.gz" | cut -d' ' -f1)"
     [ "${got}" = "${sha}" ] || die "the registry serves ${asset} with sha256 ${got}, and this tree's archive is ${sha}"
-    echo "deps.sh: ${repository} at ${commit:0:12} is published as ${OCI_HOST}/${repo}:${tag} (sha256 ${sha}); pin it in a consumer with: bash tools/deps.sh bump ${repository} --tag ${tag}"
+    echo "deps.sh: ${repository} at ${commit:0:12} is published as ${OCI_HOST}/${repo}:${ref} (sha256 ${sha}); pin it in a consumer with: bash tools/deps.sh bump ${repository} --tag ${tag}"
 }
 
 case "${1:-}" in
