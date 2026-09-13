@@ -55,8 +55,8 @@ echo 'PASS: complete flash and both readbacks precede reset'
 for offset in 32768 20971520 1093664768; do
     export RK_CORRUPT=$offset
     if run "$work/image.img"; then echo "FAIL: corrupt byte $offset accepted"; exit 1; fi
-    ! rg -q '^rd$' "$RK_LOG"
-    rg -q 'differs|mismatch' "$work/output"
+    ! grep -q '^rd$' "$RK_LOG"
+    grep -Eq 'differs|mismatch' "$work/output"
     echo "PASS: corrupt byte $offset prevents reset"
 done
 unset RK_CORRUPT
