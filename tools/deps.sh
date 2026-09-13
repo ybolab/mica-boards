@@ -3,7 +3,8 @@
 #
 #   bash tools/deps.sh fetch [--check]              every deps/sources/*.json into its path
 #   bash tools/deps.sh bump <repository> [--tag build-<commit12>] [--path <dir>]
-#   bash tools/deps.sh publish-source               this repository's HEAD as a source artifact
+#   bash tools/deps.sh publish-source [--revision <40 hex> --expect-sha256 <64 hex>]
+#                                                   HEAD, or one commit of its history, as a source artifact
 #
 # A source dependency is a pin, one JSON file per repository under
 # deps/sources/, in the shape of the Debian pins under rootfs/debian/packages:
@@ -17,7 +18,17 @@
 # the repository itself, pushed by its own CI (`publish-source`); its sha256
 # is the layer's digest. A pin that predates per-repository packages names a
 # blob of <registry>/mica-source (tagged <repository>.build-<commit12>), and
-# fetch and bump still find it there. `fetch` reads the blob by that
+# fetch and bump still find it there, asked only after the repository's own
+# package answered 404 and checked the same way.
+#
+# The archive is `git -c tar.tar.gz.command='gzip -cn' archive
+# --format=tar.gz --prefix=<repository>-<commit12>/ <commit>`: git 2.38 and
+# later compress tar.gz in-process with other bytes, so the compressor is
+# fixed or one commit would have two digests. `publish-source --revision
+# <commit> --expect-sha256 <sha>` publishes a commit of HEAD's history --
+# its tree, date and revision only, nothing of the publishing checkout -- and
+# refuses before any registry access unless the archive is byte-identical to
+# the digest consumers already pin. `fetch` reads the blob by that
 # digest, verifies it, replaces <path> with its contents and records the pin
 # in <path>/.deps-pin, so a second fetch is a no-op and the lineage record
 # can require the checkout to match the pin. <path> is gitignored: what is
@@ -158,18 +169,19 @@ oci_blob_get() { # <repo> <digest> <out> -> status; the storage redirect is foll
 oci_blob_head() { # <repo> <digest> -> status
     oci_request HEAD "$1" pull "blobs/$2" /dev/null -I
 }
-# Which of <repo>... holds <digest>, in order: "<status> TAB <repo>", the
-# first 200, else the last status other than 404 (or 404) and no repository.
-# Safe across packages because the digest is the content.
+# Which of <repo>... holds <digest>, in order: "<status> TAB <repo>". The
+# next repository is asked only after an actual 404; any other answer (401,
+# 403, a transport failure) stops the search and is returned with no
+# repository, so a refusal is never papered over by another package.
 oci_blob_where() { # <digest> <repo>...
-    local digest="$1" repo status last=404
+    local digest="$1" repo status=404
     shift
     for repo in "$@"; do
         status="$(oci_blob_head "${repo}" "${digest}")" || status=000
         [ "${status}" != 200 ] || { printf '200\t%s\n' "${repo}"; return 0; }
-        [ "${status}" = 404 ] || last="${status}"
+        [ "${status}" = 404 ] || break
     done
-    printf '%s\t\n' "${last}"
+    printf '%s\t\n' "${status}"
 }
 oci_tags() { # <repo>: every tag, one per line; empty (status 404) for a repository nobody pushed
     local repo="$1" out status last="" page
@@ -262,6 +274,10 @@ source_repo() { oci_repo "$1"; } # <repository>
 source_ref() { oci_tag source "$1"; } # <build-tag>
 legacy_source_repo() { oci_legacy_repo source; }
 legacy_source_ref() { oci_tag "$1" "$2"; } # <repository> <build-tag>
+# The one archive of a commit: fixed compressor, fixed top-level directory.
+source_archive() { # <repository> <commit> <out>
+    git -C "${REPO_ROOT}" -c tar.tar.gz.command='gzip -cn' archive --format=tar.gz --prefix="$1-${2:0:12}/" -o "$3" "$2"
+}
 pin_fields() { # file -> name repository commit path asset sha256 (validated)
     jq -e 'type == "object" and (keys | sort == ["asset","commit","name","path","repository","sha256"])
         and (.name | test("^[A-Za-z0-9][A-Za-z0-9._-]*$")) and (.repository | test("^[A-Za-z0-9][A-Za-z0-9._-]*$"))
@@ -380,6 +396,19 @@ cmd_bump() {
 }
 
 cmd_publish_source() {
+    local revision="" expect=""
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+        --revision) revision="${2-}"; shift 2 || die "--revision takes a full 40-hex commit id" ;;
+        --expect-sha256) expect="${2-}"; shift 2 || die "--expect-sha256 takes 64 lowercase hex digits" ;;
+        *) die "usage: bash tools/deps.sh publish-source [--revision <40 hex> --expect-sha256 <64 hex>]" ;;
+        esac
+    done
+    # Every refusal below comes before any registry access or token.
+    [ -z "${revision}" ] || [[ "${revision}" =~ ^[0-9a-f]{40}$ ]] || die "--revision takes a full 40-hex commit id, not '${revision}'; resolve a branch or tag to the approved commit first"
+    [ -z "${expect}" ] || [[ "${expect}" =~ ^[0-9a-f]{64}$ ]] || die "--expect-sha256 takes 64 lowercase hex digits, not '${expect}'"
+    [ -z "${revision}" ] || [ -n "${expect}" ] || die "--expect-sha256 is required with --revision: a historical publication must match the bytes consumers already pin"
+    command -v gzip >/dev/null 2>&1 || die "gzip is required: the archive is compressed by gzip -cn"
     local repository
     if [ -n "${MICA_SOURCE_REPO:-}" ]; then repository="${MICA_SOURCE_REPO}"
     else
@@ -387,21 +416,32 @@ cmd_publish_source() {
         repository="$(basename "${origin_url%/}" .git)"
         [ -n "${origin_url}" ] && [ -n "${repository}" ] || die "${REPO_ROOT} has no origin remote; set MICA_SOURCE_REPO=<name>"
     fi
-    [ -z "$(git -C "${REPO_ROOT}" status --porcelain)" ] || die "${REPO_ROOT} has uncommitted changes; a source artifact is one commit's tree"
-    local commit tag asset created repo ref
-    commit="$(git -C "${REPO_ROOT}" rev-parse HEAD)"; tag="build-${commit:0:12}"; asset="${repository}-${commit:0:12}.tar.gz"
-    created="$(git -C "${REPO_ROOT}" show -s --format=%cI HEAD)"
+    local commit
+    if [ -z "${revision}" ]; then
+        [ -z "$(git -C "${REPO_ROOT}" status --porcelain)" ] || die "${REPO_ROOT} has uncommitted changes; a source artifact is one commit's tree"
+        commit="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
+    else
+        [ "$(git -C "${REPO_ROOT}" cat-file -t "${revision}" 2>/dev/null || true)" = commit ] || die "${revision} is not a commit of ${REPO_ROOT} (a shallow checkout lacks history; fetch it whole)"
+        git -C "${REPO_ROOT}" merge-base --is-ancestor "${revision}" HEAD || die "${revision} is not in the history of HEAD; only this repository's own commits are published"
+        commit="${revision}"
+    fi
+    local tag asset created repo ref
+    tag="build-${commit:0:12}"; asset="${repository}-${commit:0:12}.tar.gz"
+    created="$(git -C "${REPO_ROOT}" show -s --format=%cI "${commit}")"
     repo="$(source_repo "${repository}")" || exit 1; ref="$(source_ref "${tag}")"
-    token --write
     local work; work="$(mktemp -d)"; trap 'rm -rf "${work}"' RETURN
-    git -C "${REPO_ROOT}" archive --format=tar.gz --prefix="${repository}-${commit:0:12}/" -o "${work}/${asset}" HEAD
+    source_archive "${repository}" "${commit}" "${work}/${asset}"
     local sha; sha="$(sha256sum "${work}/${asset}" | cut -d' ' -f1)"
+    [ -z "${expect}" ] || [ "${sha}" = "${expect}" ] || die "the archive of ${commit} hashes to sha256 ${sha}, not the expected ${expect}; nothing was published"
+    token --write
     local status
     status="$(oci_manifest_get "${repo}" "${ref}" "${work}/existing.json")"
     explain "${status}" "reading ${OCI_HOST}/${repo}:${ref}"
     if [ "${status}" = 200 ]; then
         local have; have="$(jq -r '.layers[0].digest // empty' "${work}/existing.json")"
-        [ "${have}" = "sha256:${sha}" ] || die "${OCI_HOST}/${repo}:${ref} exists with ${have:-no layer}, and this tree's archive is sha256:${sha}; under one name the registry holds other bytes"
+        [ "${have}" = "sha256:${sha}" ] || die "${OCI_HOST}/${repo}:${ref} exists with ${have:-no layer}, and this commit's archive is sha256:${sha}; under one name the registry holds other bytes"
+        [ "$(jq -r '[.artifactType, .annotations["org.opencontainers.image.revision"], .annotations["mica.source-repo"], (.layers | length), .layers[0].annotations["org.opencontainers.image.title"]] | map(tostring) | join(" ")' "${work}/existing.json")" = "application/vnd.mica.source ${commit} ${repository} 1 ${asset}" ] ||
+            die "${OCI_HOST}/${repo}:${ref} holds this commit's bytes under another identity ($(jq -c '{artifactType, revision: .annotations["org.opencontainers.image.revision"], repo: .annotations["mica.source-repo"], layers: (.layers | length)}' "${work}/existing.json")); it is not re-pointed"
         echo "deps.sh: ${asset} is already ${OCI_HOST}/${repo}:${ref}; comparing bytes"
     elif [ "${status}" = 404 ]; then
         jq -n --arg repo "${repository}" --arg commit "${commit}" --arg created "${created}" \
@@ -415,7 +455,7 @@ cmd_publish_source() {
     status="$(oci_blob_get "${repo}" "sha256:${sha}" "${work}/back.tar.gz")"
     [ "${status}" = 200 ] || die "reading ${asset} back answered HTTP ${status}"
     local got; got="$(sha256sum "${work}/back.tar.gz" | cut -d' ' -f1)"
-    [ "${got}" = "${sha}" ] || die "the registry serves ${asset} with sha256 ${got}, and this tree's archive is ${sha}"
+    [ "${got}" = "${sha}" ] || die "the registry serves ${asset} with sha256 ${got}, and this commit's archive is ${sha}"
     echo "deps.sh: ${repository} at ${commit:0:12} is published as ${OCI_HOST}/${repo}:${ref} (sha256 ${sha}); pin it in a consumer with: bash tools/deps.sh bump ${repository} --tag ${tag}"
 }
 
@@ -423,5 +463,5 @@ case "${1:-}" in
 fetch) shift; cmd_fetch "$@" ;;
 bump) shift; cmd_bump "$@" ;;
 publish-source) shift; cmd_publish_source "$@" ;;
-*) echo "usage: bash tools/deps.sh fetch [--check] | bump <repository> [--tag build-<commit12>] [--path <dir>] | publish-source" >&2; exit 1 ;;
+*) echo "usage: bash tools/deps.sh fetch [--check] | bump <repository> [--tag build-<commit12>] [--path <dir>] | publish-source [--revision <40 hex> --expect-sha256 <64 hex>]" >&2; exit 1 ;;
 esac
