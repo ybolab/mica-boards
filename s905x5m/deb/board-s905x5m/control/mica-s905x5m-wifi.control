@@ -1,0 +1,8 @@
+Package: mica-s905x5m-wifi
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: mos build <mos@example.invalid>
+Section: admin
+Priority: optional
+Depends: mica-s905x5m-wireless (= @VERSION@), mica-wifi
+Description: Seekwave Wi-Fi station selection
