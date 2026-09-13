@@ -997,8 +997,8 @@ stage_inventory() {
     # --- M1: the eth1 DHCPv4 lease defect ----------------------------------
     cap m1-networkctl-list  -- networkctl list
     cap m1-networkctl-all   -- networkctl status --all
-    cap m1-ip-link          -- ip -d link show
-    cap m1-ip-addr          -- ip -4 addr show
+    cap m1-ip-link          -- busybox ip link show
+    cap m1-ip-addr          -- busybox ip -4 addr show
     cap m1-networkd-journal -- journalctl -b -u systemd-networkd --no-pager
     capf m1-network-units /etc/systemd/network/80-dhcp.network
     local rendered
@@ -1142,8 +1142,8 @@ stage_network() {
     cap net-list      -- networkctl list
     cap net-status    -- networkctl status --all
     cap net-journal   -- journalctl -b -u systemd-networkd --no-pager
-    cap ip-addr       -- ip -4 addr show
-    cap ip-route      -- ip route show
+    cap ip-addr       -- busybox ip -4 addr show
+    cap ip-route      -- busybox ip route show
     cap rfkill        -- rfkill list
     cap wpa           -- systemctl status wpa_supplicant.service
     cap radio-dmesg   -- sh -c "dmesg | grep -iE 'aic8800|firmware|wlan|pwrseq|deferred'"
@@ -1155,7 +1155,7 @@ stage_network() {
         [ -e "$i" ] || continue
         i=$(basename "$i")
         cap "lease-$i" -- networkctl status "$i"
-        lease=$(ip -4 addr show "$i" 2>/dev/null | sed -n 's/.*inet \([0-9.]*\/[0-9]*\).*/\1/p' | head -n1)
+        lease=$(busybox ip -4 addr show "$i" 2>/dev/null | sed -n 's/.*inet \([0-9.]*\/[0-9]*\).*/\1/p' | head -n1)
         if [ -n "$lease" ]; then
             measure "M1-LEASE-$i" "has an IPv4 address: $lease"
         else
@@ -1182,9 +1182,10 @@ stage_fieldbus() {
     say "  NOTE: the CAN interface exercised here is can0 ON THE BENCH UNIT."
     say "        It must be the bench harness's own bus, never one attached to a"
     say "        live vehicle or a production machine."
-    cap can-link    -- ip -details link show can0
-    cap can-stats   -- ip -details -statistics link show can0
+    cap can-link    -- networkctl status can0
+    cap can-stats   -- sh -c 'for f in /sys/class/net/can0/statistics/*; do printf "%s %s\n" "${f##*/}" "$(cat "$f")"; done'
     capf can-conf   /etc/mica/can.conf
+    capf can-network /run/systemd/network/10-mica-can.network
     cap can-units   -- systemctl status mica-can.service mica-otg.service mica-gadget.service mica-modules.service
     cap udc         -- ls -l /sys/class/udc/
     cap gadget-tree -- find /sys/kernel/config/usb_gadget -maxdepth 3
@@ -1193,12 +1194,12 @@ stage_fieldbus() {
     cap otg-mode    -- sh -c 'cat /sys/devices/platform/*/*/otg_mode 2>/dev/null'
 
     local bitrate
-    bitrate=$(ip -details link show can0 2>/dev/null | sed -n 's/.*bitrate \([0-9]*\).*/\1/p' | head -n1)
+    bitrate=$(networkctl status can0 2>/dev/null | sed -n 's/^ *Bit Rate: *//p' | head -n1)
     measure CAN-BITRATE "${bitrate:-not read} (can.conf ships 250000, fd off, restart-ms 100)"
     if have cansend && have candump; then
         measure CAN-TOOLS "cansend and candump are present; frames can be driven from the device"
     else
-        measure CAN-TOOLS "cansend/candump are NOT on this image; frames must be driven from the peer node and observed here via ip -statistics"
+        measure CAN-TOOLS "cansend/candump are NOT on this image; frames must be driven from the peer node and observed here via /sys/class/net/can0/statistics"
     fi
 
     operator_step fieldbus \

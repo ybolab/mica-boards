@@ -22,7 +22,7 @@ endif
 # The boards, discovered: a directory with a board.env. Nothing here names one.
 BOARDS := $(patsubst boards/%/board.env,%,$(wildcard boards/*/board.env))
 
-.PHONY: help deps deps-check deps-bump build-env preflight pool package-gate publish board-contract-test kernel-config-test kernel-cmdline-test bench-collector-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test lint check
+.PHONY: help deps deps-check deps-bump build-env preflight pool package-gate publish board-contract-test kernel-config-test kernel-cmdline-test bench-collector-test mac-stable-test can-network-test gadget-configfs-test flash-verify-test wireless-test lint check
 
 help:
 	@echo "  deps                fetch build-env/ and boot/ at their pins; deps-check reads without downloading"
@@ -100,6 +100,8 @@ bench-collector-test:
 	bash boards/cx3576/tests/bench/collector-test.sh
 mac-stable-test:
 	bash boards/cx3576/tests/mac-stable-test.sh
+can-network-test:
+	bash boards/cx3576/tests/can-network-test.sh
 gadget-configfs-test:
 	bash boards/cx3576/tests/gadget-configfs-test.sh
 flash-verify-test:
@@ -110,4 +112,4 @@ wireless-test:
 lint:
 	bash tests/shell-lint.sh
 
-check: lint board-contract-test kernel-config-test kernel-cmdline-test bench-collector-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test
+check: lint board-contract-test kernel-config-test kernel-cmdline-test bench-collector-test mac-stable-test can-network-test gadget-configfs-test flash-verify-test wireless-test
