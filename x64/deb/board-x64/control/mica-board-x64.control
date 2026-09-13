@@ -1,0 +1,10 @@
+Package: mica-board-x64
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: mos build <mos@example.invalid>
+Section: admin
+Priority: optional
+Depends: mica-system
+Description: mos x64 three-partition storage policy
+ DATA mount and growth, read-only ESP mount and fixed SYSTEM geometry.
+ Kernel, verified support image and boot firmware are separate artifacts.

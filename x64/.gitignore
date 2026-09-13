@@ -1,0 +1,15 @@
+_out/
+tmp/
+.tmp/
+
+# The source dependencies, fetched at their pins by tools/deps.sh from the
+# releases of ybolab/mica-build-env and ybolab/mica-boot (deps/sources/);
+# never edited in place, never committed here.
+/build-env/
+/boot/
+# The pinned Debian base the boot-tools image installs from (mica-debian).
+/debian/
+
+# The signing workspace the kernel build embeds its trust certificate from
+# (a copy of, or a symlink to, the assembly's meta/); private.
+/meta/
