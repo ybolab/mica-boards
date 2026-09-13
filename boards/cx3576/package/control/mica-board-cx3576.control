@@ -4,7 +4,7 @@ Architecture: @ARCH@
 Maintainer: mos build <mos@example.invalid>
 Section: admin
 Priority: optional
-Depends: mica-system, iproute2, kmod, mawk | awk
+Depends: mica-system, mica-busybox, kmod, mawk | awk
 Provides: mica-board
 Conflicts: mica-board
 Description: mos hardware and storage policy for CX3576-Z

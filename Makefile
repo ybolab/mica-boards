@@ -25,7 +25,7 @@ BOARDS := $(patsubst boards/%/board.env,%,$(wildcard boards/*/board.env))
 .PHONY: help deps deps-check deps-bump build-env preflight pool package-gate publish board-contract-test kernel-config-test kernel-cmdline-test bench-collector-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test lint check
 
 help:
-	@echo "  deps                fetch build-env/, boot/ and debian/ at their pins; deps-check reads without downloading"
+	@echo "  deps                fetch build-env/ and boot/ at their pins; deps-check reads without downloading"
 	@echo "  deps-bump           DEP=<repository> [DEP_TAG=build-<commit12>] rewrites one pin"
 	@echo "  build-env           the builder images, from the pins in build-env/images.env"
 	@echo "  <board>-<target>    delegate to <board>/bsp (kernel, kernel-config, firmware; a family's own: uboot-mos, uboot, uboot-package, userland)"

@@ -5,8 +5,8 @@
 # FD mode, and brings the link up, whenever the interface registers.
 #
 # MICA_CAN_CONF and MICA_CAN_NETWORK_DIR exist for this and are unset on a
-# device. networkctl and ip are stubs on PATH: networkctl records its argv, and
-# an `ip` call is a failure, so the real script's real command lines are what
+# device. networkctl, systemctl and ip are stubs on PATH: the first two record
+# their argv, and an `ip` call is a failure, so the real script's real command lines are what
 # is read back and no host interface is ever touched.
 set -euo pipefail
 
@@ -23,12 +23,15 @@ new_case() {
     CASE=$WORK/$1
     mkdir -p "$CASE/bin" "$CASE/network"
     : >"$CASE/calls"
-    for tool in networkctl ip; do
+    for tool in networkctl systemctl ip; do
         cat >"$CASE/bin/$tool" <<STUB
 #!/bin/sh
 echo "$tool \$*" >>"$CASE/calls"
-[ "$tool" = networkctl ] || exit 1
-exit "\${MICA_TEST_NETWORKCTL_STATUS:-0}"
+case "$tool" in
+networkctl) exit "\${MICA_TEST_NETWORKCTL_STATUS:-0}" ;;
+systemctl) exit "\${MICA_TEST_NETWORKD_ACTIVE:-0}" ;;
+esac
+exit 1
 STUB
         chmod 0755 "$CASE/bin/$tool"
     done
@@ -79,7 +82,14 @@ run_can
 [ ! -e "$CASE/network/$network" ] || fail "case 3: a configuration was rendered with no interface= to match"
 CASES=$((CASES + 1))
 
-# --- 4. a networkd that cannot be reached is not a failure ---------------------
+# --- 4. networkd is only asked when it runs, and a failed ask is not a failure
+
+new_case networkd-not-running
+cp "$HERE/../package/init/can.conf" "$CASE/can.conf"
+MICA_TEST_NETWORKD_ACTIVE=3 run_can
+[ -s "$CASE/network/$network" ] || fail "case 4: nothing rendered before networkd runs"
+grep -q '^networkctl ' "$CASE/calls" \
+    && fail "case 4: networkctl was called with networkd not running; the bus call would activate networkd ahead of network-pre.target"
 
 new_case networkd-down
 cp "$HERE/../package/init/can.conf" "$CASE/can.conf"

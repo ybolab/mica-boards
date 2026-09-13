@@ -2,11 +2,12 @@
 # boot through U-Boot, SD boot). The kernel and U-Boot orchestration and the
 # source pins live in families/amlogic/; this file names the board, includes
 # the family's targets and keeps what is the board's own: the Bluetooth
-# bridge userland, the FIT tools image and the Amlogic recovery package.
+# bridge userland and the Amlogic recovery package (the FIT packager image
+# is the assembly's, built by its product driver over the bundle's tools).
 BOARD := s905x5m
 include ../../families/amlogic/Makefile.inc
 
-.PHONY: fit-tools uboot-package uboot-package-test userland
+.PHONY: uboot-package uboot-package-test userland
 
 # The recovery package is this board's firmware too.
 firmware: uboot-package
@@ -21,14 +22,6 @@ userland:
 	IMG="$$(bash $(FROM_SH) $(DEBIAN_ARG))" && \
 	docker buildx build --label ai-agent=true -t ai-agent/mos-s905x5m-userland --platform linux/arm64 --target artifact \
 	  -f userland/Dockerfile $$IMG -o $(BSP_OUT)/userland userland
-
-fit-tools:
-	@test -x "$(BSP_OUT)/uboot/tools/fit_check_sign"
-	bash ../../boot/build-tools.sh
-	docker build --label ai-agent=true -t ai-agent/mos-fit-tools-amd64 \
-	  --build-arg MICA_BOOT_TOOLS=ai-agent/mos-boot-tools-amd64 \
-	  --build-context fit-tools=$(BSP_OUT)/uboot/tools \
-	  -f ../../boot/Dockerfile.fit ../../boot
 
 # Packaging is a separate consumer of the section-3 U-Boot artifact interface.
 # It deliberately does not rebuild U-Boot: first produce the three artifacts

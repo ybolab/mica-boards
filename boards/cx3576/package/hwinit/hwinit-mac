@@ -118,8 +118,13 @@ for iface in $ifaces; do
     # collide with a vendor OUI; the topology path keeps the ports distinct.
     mac=$(printf '%s-%s' "$seed" "$topology" | md5sum | awk \
         '{h=$1;printf "02:%s:%s:%s:%s:%s",substr(h,1,2),substr(h,3,2),substr(h,5,2),substr(h,7,2),substr(h,9,2)}')
-    ip link set dev "$iface" down 2>/dev/null || true
-    if ! err=$(ip link set dev "$iface" address "$mac" 2>&1); then
+    # BusyBox's ip applet, because the image carries no iproute2 and the write
+    # has to happen here, inside the udev event, before networkd can see the
+    # link: a .link MACAddress= is a constant that cannot carry this derived
+    # address, and networkd configures the link only after this program has
+    # returned, so neither can take its place.
+    busybox ip link set dev "$iface" down 2>/dev/null || true
+    if ! err=$(busybox ip link set dev "$iface" address "$mac" 2>&1); then
         echo "hwinit-mac: $iface: could not set $mac (topology $topology): ${err:-ip reported nothing}" >&2
     fi
 done

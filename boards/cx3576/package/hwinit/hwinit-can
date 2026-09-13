@@ -26,7 +26,10 @@ else
         [ -z "$fd" ] || printf 'FDMode=%s\n' "$fd"
     } >"$NETWORK.tmp" && mv "$NETWORK.tmp" "$NETWORK"
 fi
-# A restart after networkd is up applies the change; at boot networkd is not
-# running yet and reads the file when it starts.
-networkctl reload 2>/dev/null || true
+# A restart after networkd is up applies the change. At boot networkd is not
+# running yet and reads the file when it starts; networkctl is not called then,
+# because a bus call would activate networkd ahead of network-pre.target.
+if systemctl is-active --quiet systemd-networkd.service 2>/dev/null; then
+    networkctl reload 2>/dev/null || true
+fi
 exit 0

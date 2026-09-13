@@ -24,8 +24,9 @@
 # `platform/22000000.pcie/…/0000:01:00.0` for the PCIe part -- and a fixture
 # that stored the string instead would be asserting against its own answer.
 # MICA_MAC_SYSFS and MICA_MAC_CONF exist for this and are unset on a device;
-# ip(8) is a stub on PATH, so the real script's real command line is what is
-# read back.
+# busybox(1) is a stub on PATH, so the real script's real command line is what
+# is read back. The image carries no iproute2, so a bare ip(8) is a stub too,
+# and calling it is a failure rather than a reach into the host.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -47,8 +48,8 @@ GMAC=platform/2a220000.ethernet
 PCIE=platform/22000000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0
 SEED='0x15010041424344450123456789abcdef'
 
-# One case: a fresh fake sysfs, a seed file, a conf that points at it and an
-# ip(8) that records instead of configuring.
+# One case: a fresh fake sysfs, a seed file, a conf that points at it and a
+# `busybox ip` that records instead of configuring.
 new_case() {
     CASE=$WORK/$1
     mkdir -p "$CASE/sys/class/net" "$CASE/sys/devices" "$CASE/bin"
@@ -56,12 +57,19 @@ new_case() {
     printf 'seed=%s\n' "$CASE/cid" >"$CASE/mac.conf"
     IPLOG=$CASE/ip.log
     : >"$IPLOG"
-    cat >"$CASE/bin/ip" <<'IPSTUB'
+    cat >"$CASE/bin/busybox" <<'IPSTUB'
 #!/bin/sh
+[ "$1" = ip ] || { echo "busybox $*: not the ip applet" >&2; exit 1; }
+shift
 echo "$*" >>"$MICA_TEST_IPLOG"
 exit "${MICA_TEST_IP_STATUS:-0}"
 IPSTUB
-    chmod 0755 "$CASE/bin/ip"
+    cat >"$CASE/bin/ip" <<'IPSTUB'
+#!/bin/sh
+echo "ip $*" >>"$MICA_TEST_IPLOG.bare"
+exit 1
+IPSTUB
+    chmod 0755 "$CASE/bin/busybox" "$CASE/bin/ip"
 }
 
 # A NIC: an interface name, and the device path it hangs off. `net/<iface>` under
@@ -224,6 +232,14 @@ mknic eth0 "$GMAC"
 IP_STATUS=1 run_mac
 grep -q "could not set $in_order_gmac" "$CASE/stderr" \
     || fail "ip(8) refused the address and nothing said so; stderr was: $(cat "$CASE/stderr")"
+CASES=$((CASES + 1))
+
+# --- 10. no iproute2: the write goes through busybox --------------------------
+
+for bare in "$WORK"/*/ip.log.bare; do
+    [ -e "$bare" ] || continue
+    fail "hwinit-mac called a bare ip(8), which this image does not carry: $(cat "$bare")"
+done
 CASES=$((CASES + 1))
 
 echo "PASS mac-stable-test: ${CASES} cases"
