@@ -32,7 +32,8 @@ present() { examined=$((examined + 1)); [ -e "$1" ] && return 0; missing=$((miss
 for f in "${KERNEL_FILES[@]}"; do present "${OUT}/kernel/${f}" "run \`make kernel\` (an hour of compiling; not started from a packaging hook)" || true; done
 present "${TRUST_CERT}" "the verity trust certificate the kernel was built against; set VERITY_TRUST_CERT or put the signing workspace at meta/" || true
 present "${REPO_ROOT}/board.env" "the board definition" || true
-present "${REPO_ROOT}/evidence.json" "the board evidence" || true
+# evidence.json is a board record some boards carry; it is staged when present
+# and its absence is not a missing input.
 
 for t in uboot uboot-package; do present "${OUT}/${t}" "run `make uboot` and `make uboot-package`" || true; done
 if [ "${PREFLIGHT}" != 0 ]; then
@@ -45,7 +46,7 @@ fi
 stage_tree() { mkdir -p "$2"; cp -a "$1"/. "$2"/; }
 stage_tree "${OUT}/kernel" "${STAGE}/kernel"
 install -m 0644 "${REPO_ROOT}/board.env" "${STAGE}/board.env"
-install -m 0644 "${REPO_ROOT}/evidence.json" "${STAGE}/evidence.json"
+[ ! -f "${REPO_ROOT}/evidence.json" ] || install -m 0644 "${REPO_ROOT}/evidence.json" "${STAGE}/evidence.json"
 install -D -m 0644 "${TRUST_CERT}" "${STAGE}/trust/verity-signer.cert.pem"
 # The firmware files the support image carries and the component copyright
 # that names their licences (build/src/kernel-package.ts in the assembly reads
