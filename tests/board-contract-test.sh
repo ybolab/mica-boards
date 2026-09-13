@@ -101,6 +101,34 @@ for dir in */; do
     done
     shopt -u nullglob
 
+    # The authenticated boot facts the assembly's kernel component and
+    # firmware package read (plan 20260913-0416, C4): the firmware format
+    # agrees with the boot backend, a FIT board names its device tree, its
+    # watchdog symbol, its three load addresses and its loader, and every
+    # board's command line carries the signed-boot floor.
+    backend="$(plain_value "${board}/board.env" BOOT_BACKEND || true)"
+    format="$(plain_value "${board}/board.env" FIRMWARE_FORMAT || true)"
+    case "${backend}:${format}" in
+    systemd-boot:efi | uboot-fit:rockchip-loader | uboot-fit:amlogic-boot0) pass ;;
+    *) fail "${board}: BOOT_BACKEND=${backend:-unset} with FIRMWARE_FORMAT=${format:-unset}; systemd-boot boots efi, uboot-fit a rockchip-loader or an amlogic-boot0" ;;
+    esac
+    if [ "${backend}" = uboot-fit ]; then
+        for key in FIT_DTB FIT_WATCHDOG FIT_LOAD_ADDRESSES UBOOT_BIN_NAME UBOOT_MAX_BYTES; do
+            v="$(plain_value "${board}/board.env" "${key}" || true)"
+            [ -n "${v}" ] || fail "${board}: a FIT board declares ${key}"
+        done
+        addrs="$(plain_value "${board}/board.env" FIT_LOAD_ADDRESSES || true)"
+        [ "$(printf '%s\n' ${addrs} | grep -cE '^0x[0-9a-fA-F]+$')" -eq 3 ] || fail "${board}: FIT_LOAD_ADDRESSES is three hexadecimal addresses (kernel, initramfs, device tree), not '${addrs}'"
+        case "${format}" in
+        amlogic-boot0) for key in UBOOT_MIN_BYTES UBOOT_PAYLOAD_OFFSET_BYTES; do [ -n "$(plain_value "${board}/board.env" "${key}" || true)" ] || fail "${board}: an amlogic-boot0 board declares ${key}"; done ;;
+        rockchip-loader) for key in UBOOT_SEEK_SECTOR LOADER_MAGIC_HEX; do [ -n "$(plain_value "${board}/board.env" "${key}" || true)" ] || fail "${board}: a rockchip-loader board declares ${key}"; done ;;
+        esac
+    fi
+    cmdline="$(plain_value "${board}/board.env" BOARD_CMDLINE_ARGS || true)"
+    for arg in dm_verity.require_signatures=1 rdinit=/init; do
+        case " ${cmdline} " in *" ${arg} "*) ;; *) fail "${board}: BOARD_CMDLINE_ARGS is the authenticated command line and lacks ${arg}" ;; esac
+    done
+
     hook="${board}/deb/kernel-${board}/prepare.sh"
     if [ -f "${hook}" ]; then
         grep -c 'manifests' "${hook}" >/dev/null || fail "${hook} does not stage manifests/ into the bundle"
