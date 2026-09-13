@@ -8,6 +8,9 @@ include ../../families/amlogic/Makefile.inc
 
 .PHONY: fit-tools uboot-package uboot-package-test userland
 
+# The recovery package is this board's firmware too.
+firmware: uboot-package
+
 DEBIAN_ARG := MICA_IMAGE_DEBIAN_TRIXIE=IMAGE_DEBIAN_TRIXIE
 UBOOT_ARTIFACTS := $(BSP_OUT)/uboot/u-boot.bin.signed \
 	$(BSP_OUT)/uboot/u-boot.bin.sd.bin.signed \

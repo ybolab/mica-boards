@@ -109,15 +109,15 @@ RUN set -eu; \
     done; \
     \
     # The status indicator, from the board overlay, byte for byte including the \
-    # wants symlink cp -a preserves. Gated on the board's own declaration: x64 \
-    # has no /sys/class/leds and the unit failed on every boot there, which is \
-    # the difference BOARD_HAS_STATUS_LED exists to record. \
-    if [ "${BOARD_HAS_STATUS_LED:-0}" = 1 ]; then \
+    # wants symlink cp -a preserves. Gated on the board's own declaration: a \
+    # board with no /sys/class/leds would fail the unit on every boot, which \
+    # is the difference the status-led feature exists to record. \
+    case " ${BOARD_FEATURES} " in *" status-led "*) \
         install -m 0755 /in/board-overlay/usr/lib/mica/mica-status-led "${ROOT}/usr/lib/mica/mica-status-led"; \
         install -m 0644 /in/board-overlay/usr/lib/systemd/system/mica-status-led.service "${ROOT}/usr/lib/systemd/system/mica-status-led.service"; \
         cp -a /in/board-overlay/etc/systemd/system/multi-user.target.wants/mica-status-led.service \
             "${ROOT}/etc/systemd/system/multi-user.target.wants/mica-status-led.service"; \
-    fi; \
+    ;; esac; \
     \
     install -D -m 0644 /in/copyright "${ROOT}/usr/share/doc/${PKG}/copyright"; \
     pack.sh --root "${ROOT}" --control "/in/control/${PKG}.control" \

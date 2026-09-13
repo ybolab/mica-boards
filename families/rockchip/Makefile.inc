@@ -34,7 +34,7 @@ VERITY_TRUST_CERT ?= ../../meta/verity/signer.cert.pem
 FIT_TRUST_CERT ?=
 VERITY_TOOL := ../../boot/verity-tool.sh
 
-.PHONY: kernel uboot-mos clean
+.PHONY: kernel uboot-mos firmware clean
 kernel:
 	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(VERITY_TRUST_CERT)" "$(BSP_OUT)/verity-trust")" && \
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
@@ -64,5 +64,6 @@ uboot-mos:
 	  -f $(FAMILY_DIR)/uboot/Dockerfile --target artifact-mos $$IMG \
 	  -o $(BSP_OUT)/uboot-mos uboot
 
+firmware: uboot-mos
 clean:
 	rm -rf $(BSP_OUT)

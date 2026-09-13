@@ -59,7 +59,7 @@ KERNEL_BUILD = TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(VERITY_TRUST_CERT)" "$
 	  -f $(FAMILY_DIR)/kernel/Dockerfile $$IMG \
 	  $(if $(KERNEL_BUILDER),--builder $(KERNEL_BUILDER))
 
-.PHONY: kernel kernel-config clean
+.PHONY: kernel kernel-config firmware clean
 kernel:
 	$(KERNEL_BUILD) --target artifact -o $(BSP_OUT)/kernel kernel
 	@ls -la $(BSP_OUT)/kernel/
@@ -73,5 +73,9 @@ kernel-config:
 	$(KERNEL_BUILD) --target config -o kernel/config kernel
 	@echo "recorded: kernel/config/$(BOARD).config ($$(grep -c . kernel/config/$(BOARD).config) lines)"
 
+# A UEFI board ships no boot firmware of its own; make firmware is a no-op
+# so that make firmware over every board asks each family the same thing.
+firmware:
+	@echo "$(BOARD): no firmware to build (UEFI)"
 clean:
 	rm -rf $(BSP_OUT)

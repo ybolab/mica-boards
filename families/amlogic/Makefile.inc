@@ -25,7 +25,7 @@ VERITY_TRUST_CERT ?= ../../meta/verity/signer.cert.pem
 FIT_TRUST_CERT ?=
 VERITY_TOOL := ../../boot/verity-tool.sh
 
-.PHONY: kernel uboot clean
+.PHONY: kernel uboot firmware clean
 kernel:
 	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(VERITY_TRUST_CERT)" "$(BSP_OUT)/verity-trust")" && \
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
@@ -49,5 +49,7 @@ uboot:
 	  -f $(FAMILY_DIR)/uboot/Dockerfile $$IMG \
 	  -o $(BSP_OUT)/uboot uboot
 
+# What the family builds; a board adds its own (s905x5m: uboot-package).
+firmware: uboot
 clean:
 	rm -rf $(BSP_OUT)

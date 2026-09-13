@@ -192,7 +192,7 @@ CONFIG_CRYPTO_LIB_SHA256=y
 CONFIG_CRYPTO_AES_NI_INTEL=y
 
 # --- what x64 deliberately does NOT have ------------------------------------
-# No wireless: board.env declares BOARD_RADIOS="" and the image
+# No wireless: board.env declares no radio in BOARD_FEATURES and the image
 # ships no bluez, no wpasupplicant and no hostapd, so a kernel with a WiFi
 # stack would be carrying drivers for a userland that cannot drive them.
 # No sound, no DRM/GPU, no media, no industrial I/O: nothing in the image opens

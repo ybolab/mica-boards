@@ -44,8 +44,8 @@ jobs:
       - name: Every board's kernel and firmware
         run: |
           set -euo pipefail
-          make x64-kernel virt-arm64-kernel cx3576-kernel s905x5m-kernel
-          make cx3576-uboot-mos s905x5m-uboot s905x5m-uboot-package FIT_TRUST_CERT=../../meta/boot/signer.cert.pem
+          make kernels
+          make firmware FIT_TRUST_CERT=../../meta/boot/signer.cert.pem
       - name: Pack, gate and publish
         run: |
           set -euo pipefail

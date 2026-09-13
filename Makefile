@@ -28,7 +28,8 @@ help:
 	@echo "  deps                fetch build-env/, boot/ and debian/ at their pins; deps-check reads without downloading"
 	@echo "  deps-bump           DEP=<repository> [DEP_TAG=build-<commit12>] rewrites one pin"
 	@echo "  build-env           the builder images, from the pins in build-env/images.env"
-	@echo "  <board>-<target>    delegate to <board>/bsp (kernel, kernel-config; cx3576: uboot-mos, flash-mos; s905x5m: uboot, userland, fit-tools, uboot-package)"
+	@echo "  <board>-<target>    delegate to <board>/bsp (kernel, kernel-config, firmware; a family's own: uboot-mos, uboot, uboot-package, userland)"
+	@echo "  kernels, firmware   the same for every discovered board (what release.yml builds)"
 	@echo "                      a kernel embeds the verity trust certificate: VERITY_TRUST_CERT (default meta/verity/signer.cert.pem)"
 	@echo "  pool                every producer of every board, both architectures, indexed into _out/debs"
 	@echo "  package-gate        the package gate over that pool"
@@ -57,6 +58,12 @@ $(1)-%:
 	$$(MAKE) -C $(1)/bsp $$*
 endef
 $(foreach b,$(BOARDS),$(eval $(call board_delegation,$(b))))
+
+# Every discovered board's kernel, and every board's firmware where its family
+# has one: what a release builds, with no board typed into a workflow.
+.PHONY: kernels firmware
+kernels: $(BOARDS:%=%-kernel)
+firmware: $(BOARDS:%=%-firmware)
 
 preflight:
 	bash build-env/deb/preflight.sh
