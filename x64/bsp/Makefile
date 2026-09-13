@@ -20,7 +20,7 @@
 # BOARD_DIR is the bsp SOURCE directory -- committed firmware, containers.env,
 # this Makefile -- and conflating the two is what made "point BOARD_DIR at
 # prebuilt artefacts" also repoint the firmware.
-BSP_OUT ?= ../_out/bsp
+BSP_OUT ?= ../../_out/x64
 
 
 # EVERY BASE IMAGE COMES FROM build-env/images.env. The Dockerfile declares its
@@ -33,13 +33,13 @@ BSP_OUT ?= ../_out/bsp
 # command while make PARSES the file, discards its exit status and its stderr,
 # and leaves the variable empty on failure. Inside a recipe the `&&`
 # short-circuits and make stops with from.sh's own message.
-FROM_SH := ../build-env/from.sh
+FROM_SH := ../../build-env/from.sh
 UBUNTU_ARG := MICA_IMAGE_UBUNTU_2404=IMAGE_UBUNTU_2404
 
 # Distribute the same public certificate bundle to every builder. Kernel builds
 # never mint keys; development material is generated explicitly before building.
-VERITY_TRUST_CERT ?= ../meta/verity/signer.cert.pem
-VERITY_TOOL := ../boot/verity-tool.sh
+VERITY_TRUST_CERT ?= ../../meta/verity/signer.cert.pem
+VERITY_TOOL := ../../boot/verity-tool.sh
 
 all: kernel
 
@@ -50,7 +50,7 @@ all: kernel
 kernel:
 	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(VERITY_TRUST_CERT)" "$(BSP_OUT)/verity-trust")" && \
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
-	docker buildx build --build-context mos-common=../boot/common \
+	docker buildx build --build-context mos-common=../../boot/common \
 	  --build-context "mos-trust=$$TRUST_DIR" \
 	  -f kernel/Dockerfile --target artifact $$IMG \
 	  $(if $(KERNEL_BUILDER),--builder $(KERNEL_BUILDER)) \
@@ -66,7 +66,7 @@ kernel:
 kernel-config:
 	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(VERITY_TRUST_CERT)" "$(BSP_OUT)/verity-trust")" && \
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
-	docker buildx build --build-context mos-common=../boot/common \
+	docker buildx build --build-context mos-common=../../boot/common \
 	  --build-context "mos-trust=$$TRUST_DIR" \
 	  -f kernel/Dockerfile --target config $$IMG \
 	  $(if $(KERNEL_BUILDER),--builder $(KERNEL_BUILDER)) \

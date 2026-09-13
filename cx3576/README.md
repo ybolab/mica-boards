@@ -1,19 +1,10 @@
-# mica-cx3576
+# cx3576
 
 The cx3576 board (Rockchip RK3576, signed FIT boot through U-Boot) of Mica OS: the board definition
 (`board.env`), the BSP build (`bsp/`), the board packages (`deb/`) and the
-board evidence (`evidence.json`). A repository of its own, standing on two
-source pins fetched at their commits: `build-env/` (`mica-build-env`) and
-`boot/` (`mica-boot`).
+board evidence (`evidence.json`). One board of `ybolab/mica-boards`; `make cx3576-kernel`, `make pool` and
+`make publish` at the repository root build, pack and release it.
 
-```
-make deps            # build-env/ and boot/ at deps/sources/*.json
-make build-env       # the builder images
-make kernel          # the board kernel into _out/bsp/kernel (needs the trust certificate, see below)
-make pool            # the board packages and mica-kernel-cx3576, indexed into _out/debs
-make package-gate    # the gate over that pool
-make publish         # the release build-<commit12> of this commit
-```
 
 The kernel embeds the dm-verity trust certificate of the deployment it will
 boot: `VERITY_TRUST_CERT` (default `meta/verity/signer.cert.pem`, the

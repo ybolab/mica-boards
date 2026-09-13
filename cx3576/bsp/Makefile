@@ -15,10 +15,10 @@
 # BOARD_DIR is the bsp SOURCE directory -- committed firmware, containers.env,
 # this Makefile -- and conflating the two is what made "point BOARD_DIR at
 # prebuilt artefacts" also repoint the firmware.
-BSP_OUT ?= ../_out/bsp
+BSP_OUT ?= ../../_out/cx3576
 
 # The complete factory image is assembled from independently signed components.
-MICA_OUT ?= ../_out/image
+MICA_OUT ?= ../../_out/image
 MICA_IMAGE ?= $(lastword $(sort $(wildcard $(MICA_OUT)/mos-cx3576-*.img)))
 
 TOOLS_DIR ?= tools
@@ -44,19 +44,19 @@ SHA256 := $(shell command -v sha256sum >/dev/null 2>&1 && echo sha256sum || echo
 # fails the assignment, the `&&` short-circuits, and make stops with the message
 # from.sh printed. The one cost is that the value is computed per target, which
 # is a file read.
-FROM_SH := ../build-env/from.sh
+FROM_SH := ../../build-env/from.sh
 UBUNTU_ARG := MICA_IMAGE_UBUNTU_2404=IMAGE_UBUNTU_2404
 
 # Distribute the same public certificate bundle to every builder. Kernel builds
 # never mint keys; development material is generated explicitly before building.
-VERITY_TRUST_CERT ?= ../meta/verity/signer.cert.pem
+VERITY_TRUST_CERT ?= ../../meta/verity/signer.cert.pem
 FIT_TRUST_CERT ?=
-VERITY_TOOL := ../boot/verity-tool.sh
+VERITY_TOOL := ../../boot/verity-tool.sh
 ALPINE_ARG := MICA_IMAGE_ALPINE_3_24_1=IMAGE_ALPINE_3_24_1
 
 all: kernel uboot-mos
 
-# `--build-context bsp-scripts=scripts --build-context mos-common=../boot/common` is what lets the U-Boot target keep
+# `--build-context bsp-scripts=scripts --build-context mos-common=../../boot/common` is what lets the U-Boot target keep
 # `uboot` as its build context while still reading bsp/scripts/.
 # The kernel target's context is the board directory and reaches them with a
 # plain COPY; widening this one to match would put the committed Wi-Fi firmware
@@ -66,7 +66,7 @@ uboot-mos:
 	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(FIT_TRUST_CERT)" "$(BSP_OUT)/fit-trust")" && \
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
 	docker buildx build --label ai-agent=true -t ai-agent/mos-cx-uboot \
-	  --build-context bsp-scripts=scripts --build-context mos-common=../boot/common --build-context "mos-boot-trust=$$TRUST_DIR" \
+	  --build-context bsp-scripts=scripts --build-context mos-common=../../boot/common --build-context "mos-boot-trust=$$TRUST_DIR" \
 	  -f uboot/Dockerfile --target artifact-mos $$IMG \
 	  $(if $(UBOOT_COMMIT),--build-arg UBOOT_COMMIT=$(UBOOT_COMMIT)) \
 	  $(if $(RKBIN_COMMIT),--build-arg RKBIN_COMMIT=$(RKBIN_COMMIT)) \
@@ -75,7 +75,7 @@ uboot-mos:
 kernel:
 	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(VERITY_TRUST_CERT)" "$(BSP_OUT)/verity-trust")" && \
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
-	docker buildx build --build-context mos-common=../boot/common \
+	docker buildx build --build-context mos-common=../../boot/common \
 	  --build-context "mos-trust=$$TRUST_DIR" -f kernel/Dockerfile $$IMG \
 	  $(if $(KERNEL_COMMIT),--build-arg KERNEL_COMMIT=$(KERNEL_COMMIT)) \
 	  $(if $(KERNEL_EXPECT),--build-arg KERNEL_EXPECT=$(KERNEL_EXPECT)) \

@@ -1,0 +1,56 @@
+name: release
+# The offline gates on every push; the pool -- every board package and
+# every kernel archive -- is built and published by workflow_dispatch, with
+# the deployment's trust certificates supplied as secrets, because a kernel
+# built against a throwaway certificate is of no use to the assembly.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the source pins
+        run: make deps
+        env:
+          GH_TOKEN: ${{ secrets.MICA_DEPS_TOKEN }}
+      - name: Lint, the kernel-config floor and the boards' tests
+        run: make check
+  release:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the source pins
+        run: make deps
+        env:
+          GH_TOKEN: ${{ secrets.MICA_DEPS_TOKEN }}
+      - name: The trust certificates the kernels and U-Boot embed
+        run: |
+          set -euo pipefail
+          mkdir -p meta/verity meta/boot
+          printf '%s' "${{ secrets.MICA_VERITY_TRUST_CERT }}" | base64 -d > meta/verity/signer.cert.pem
+          printf '%s' "${{ secrets.MICA_BOOT_TRUST_CERT }}" | base64 -d > meta/boot/signer.cert.pem
+      - name: Emulation for the arm64 builds
+        uses: docker/setup-qemu-action@v3
+      - name: Builder images, both architectures
+        run: |
+          set -euo pipefail
+          make build-env
+          MICA_BUILD_PLATFORM=linux/arm64 make build-env
+      - name: Every board's kernel and firmware
+        run: |
+          set -euo pipefail
+          make x64-kernel virt-arm64-kernel cx3576-kernel s905x5m-kernel
+          make cx3576-uboot-mos s905x5m-uboot s905x5m-uboot-package FIT_TRUST_CERT=../../meta/boot/signer.cert.pem
+      - name: Pack, gate and publish
+        run: |
+          set -euo pipefail
+          make pool
+          make package-gate
+          make publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

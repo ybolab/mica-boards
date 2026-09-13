@@ -2,5 +2,5 @@
 # Compile the board-owned bridge with the pinned target userspace toolchain.
 set -euo pipefail
 [ "$MICA_DEB_ARCH" = arm64 ]
-make -C "$MICA_DEB_REPO_ROOT/bsp" userland
-cp -a "$MICA_DEB_REPO_ROOT/_out/bsp/userland/." "$MICA_DEB_STAGE/"
+make -C "$MICA_DEB_REPO_ROOT/s905x5m/bsp" userland
+cp -a "$MICA_DEB_REPO_ROOT/_out/s905x5m/userland/." "$MICA_DEB_STAGE/"
