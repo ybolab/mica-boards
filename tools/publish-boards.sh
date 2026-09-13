@@ -28,7 +28,7 @@ for t in curl sha256sum python3 git jq tar; do
 done
 registry_load
 registry_repo_name
-registry_token
+registry_token --write
 [ -z "$(git -C "${REPO_ROOT}" status --porcelain)" ] || { echo "error: ${REPO_ROOT} has uncommitted changes; a bundle is published as the output of one commit" >&2; exit 1; }
 HEAD_COMMIT="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
 HEAD_CREATED="$(git -C "${REPO_ROOT}" show -s --format=%cI HEAD)"
