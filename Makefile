@@ -19,9 +19,10 @@ $(error boot/ is empty: the boot tooling is fetched at its pin from ybolab/mica-
 endif
 endif
 
-BOARDS := x64 virt-arm64 cx3576 s905x5m
+# The boards, discovered: a directory with a board.env. Nothing here names one.
+BOARDS := $(patsubst %/board.env,%,$(wildcard */board.env))
 
-.PHONY: help deps deps-check deps-bump build-env preflight pool package-gate publish board-contract-test kernel-config-test kernel-cmdline-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test lint check
+.PHONY: help deps deps-check deps-bump build-env preflight pool package-gate publish board-contract-test kernel-config-test kernel-cmdline-test bench-collector-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test lint check
 
 help:
 	@echo "  deps                fetch build-env/, boot/ and debian/ at their pins; deps-check reads without downloading"
@@ -48,16 +49,14 @@ deps-bump:
 build-env:
 	bash build-env/build.sh
 
-# The <board>-% delegation rules are pattern rules (unlisted in .PHONY, which
-# takes no patterns): the delegated names are open-ended.
-x64-%:
-	$(MAKE) -C x64/bsp $*
-virt-arm64-%:
-	$(MAKE) -C virt-arm64/bsp $*
-cx3576-%:
-	$(MAKE) -C cx3576/bsp $*
-s905x5m-%:
-	$(MAKE) -C s905x5m/bsp $*
+# The <board>-% delegation rules, one per discovered board (pattern rules,
+# unlisted in .PHONY, which takes no patterns): the delegated names are
+# open-ended, and a new board gets its rule the day its board.env lands.
+define board_delegation
+$(1)-%:
+	$$(MAKE) -C $(1)/bsp $$*
+endef
+$(foreach b,$(BOARDS),$(eval $(call board_delegation,$(b))))
 
 preflight:
 	bash build-env/deb/preflight.sh
@@ -85,13 +84,12 @@ board-contract-test:
 	bash tests/board-contract-test.sh
 
 kernel-config-test:
-	bash boot/common/kernel-config-test.sh x64 x64/bsp/kernel/config/x64.config families/uefi/kernel/Dockerfile
-	bash boot/common/kernel-config-test.sh virt-arm64 virt-arm64/bsp/kernel/config/virt-arm64.config families/uefi/kernel/Dockerfile
-	bash boot/common/kernel-config-test.sh cx3576 cx3576/bsp/kernel/config/kernel-cx3576z.config families/rockchip/kernel/configure.sh
-	bash boot/common/kernel-config-test.sh s905x5m s905x5m/bsp/kernel/config/kernel-s905x5m.config families/amlogic/kernel/configure.sh
+	bash tools/kernel-config-test.sh
 
 kernel-cmdline-test:
 	bash cx3576/tests/kernel-cmdline-test.sh
+bench-collector-test:
+	bash cx3576/tests/bench/collector-test.sh
 mac-stable-test:
 	bash cx3576/tests/mac-stable-test.sh
 gadget-configfs-test:
@@ -104,4 +102,4 @@ wireless-test:
 lint:
 	bash gate/shell-lint.sh
 
-check: lint board-contract-test kernel-config-test kernel-cmdline-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test
+check: lint board-contract-test kernel-config-test kernel-cmdline-test bench-collector-test mac-stable-test gadget-configfs-test flash-verify-test wireless-test
