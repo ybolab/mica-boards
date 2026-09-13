@@ -19,16 +19,16 @@
 #include <u-boot/crc.h>
 #include "mos-records.h"
 
-#define MOS_ENV_SIZE 65536
-#define MOS_ENV_BLOCKS (MOS_ENV_SIZE / 512)
-#define MOS_FIT_ADDRESS 0x60000000UL
-#define MOS_FIT_LIMIT (128 * 1024 * 1024)
+#define MICA_ENV_SIZE 65536
+#define MICA_ENV_BLOCKS (MICA_ENV_SIZE / 512)
+#define MICA_FIT_ADDRESS 0x60000000UL
+#define MICA_FIT_LIMIT (128 * 1024 * 1024)
 static const unsigned long env_blocks[2] = { 32768, 34816 };
 char mos_deployment_id[65];
 
 static int valid_environment(const unsigned char *bytes)
 {
-	return get_unaligned_le32(bytes) == crc32(0, bytes + 5, MOS_ENV_SIZE - 5);
+	return get_unaligned_le32(bytes) == crc32(0, bytes + 5, MICA_ENV_SIZE - 5);
 }
 
 static int decode_environment(const unsigned char *bytes, struct mos_boot_records *records)
@@ -38,11 +38,11 @@ static int decode_environment(const unsigned char *bytes, struct mos_boot_record
 
 	if (memcmp(bytes + 5, "mos_entries=", 12))
 		return -1;
-	for (end = 17; end < MOS_ENV_SIZE && bytes[end]; end++)
+	for (end = 17; end < MICA_ENV_SIZE && bytes[end]; end++)
 		;
-	if (end - 17 > MOS_BOOT_VALUE_LIMIT || end + 1 >= MOS_ENV_SIZE)
+	if (end - 17 > MICA_BOOT_VALUE_LIMIT || end + 1 >= MICA_ENV_SIZE)
 		return -1;
-	for (; end < MOS_ENV_SIZE; end++)
+	for (; end < MICA_ENV_SIZE; end++)
 		if (bytes[end])
 			return -1;
 	return mos_boot_parse(value, records);
@@ -54,13 +54,13 @@ static int read_environment(struct blk_desc *disk, unsigned char *copies,
 	int valid[2], slot, i;
 
 	for (i = 0; i < 2; i++) {
-		unsigned char *copy = copies + i * MOS_ENV_SIZE;
+		unsigned char *copy = copies + i * MICA_ENV_SIZE;
 
-		valid[i] = blk_dread(disk, env_blocks[i], MOS_ENV_BLOCKS, copy) == MOS_ENV_BLOCKS
+		valid[i] = blk_dread(disk, env_blocks[i], MICA_ENV_BLOCKS, copy) == MICA_ENV_BLOCKS
 			&& valid_environment(copy);
 	}
-	slot = mos_boot_slot(valid[0], copies[4], valid[1], copies[MOS_ENV_SIZE + 4]);
-	if (slot < 0 || decode_environment(copies + slot * MOS_ENV_SIZE, records))
+	slot = mos_boot_slot(valid[0], copies[4], valid[1], copies[MICA_ENV_SIZE + 4]);
+	if (slot < 0 || decode_environment(copies + slot * MICA_ENV_SIZE, records))
 		return -1;
 	return slot;
 }
@@ -69,24 +69,24 @@ static int persist_environment(struct mmc *mmc, unsigned char *copies,
 			       int slot, const struct mos_boot_records *records)
 {
 	struct blk_desc *disk = mmc_get_blk_desc(mmc);
-	unsigned char *pending = copies + (1 - slot) * MOS_ENV_SIZE;
-	unsigned char *readback = copies + slot * MOS_ENV_SIZE;
+	unsigned char *pending = copies + (1 - slot) * MICA_ENV_SIZE;
+	unsigned char *readback = copies + slot * MICA_ENV_SIZE;
 	unsigned char flag = readback[4] + 1;
-	char text[MOS_BOOT_VALUE_LIMIT + 1];
+	char text[MICA_BOOT_VALUE_LIMIT + 1];
 
 	if (mos_boot_render(records, text))
 		return -1;
-	memset(pending, 0, MOS_ENV_SIZE);
+	memset(pending, 0, MICA_ENV_SIZE);
 	pending[4] = flag;
 	memcpy(pending + 5, "mos_entries=", 12);
 	memcpy(pending + 17, text, strlen(text));
-	put_unaligned_le32(crc32(0, pending + 5, MOS_ENV_SIZE - 5), pending);
-	if (blk_dwrite(disk, env_blocks[1 - slot], MOS_ENV_BLOCKS, pending) != MOS_ENV_BLOCKS ||
+	put_unaligned_le32(crc32(0, pending + 5, MICA_ENV_SIZE - 5), pending);
+	if (blk_dwrite(disk, env_blocks[1 - slot], MICA_ENV_BLOCKS, pending) != MICA_ENV_BLOCKS ||
 	    mmc_flush_cache(mmc))
 		return -1;
 	blkcache_invalidate(disk->uclass_id, disk->devnum);
-	if (blk_dread(disk, env_blocks[1 - slot], MOS_ENV_BLOCKS, readback) != MOS_ENV_BLOCKS ||
-	    memcmp(readback, pending, MOS_ENV_SIZE))
+	if (blk_dread(disk, env_blocks[1 - slot], MICA_ENV_BLOCKS, readback) != MICA_ENV_BLOCKS ||
+	    memcmp(readback, pending, MICA_ENV_SIZE))
 		return -1;
 	return 0;
 }
@@ -153,10 +153,10 @@ void __noreturn mos_file_boot(void)
 	disk = mmc_get_blk_desc(mmc);
 	if (valid_layout(disk))
 		recovery("fresh three-partition layout required");
-	copies = memalign(ARCH_DMA_MINALIGN, 2 * MOS_ENV_SIZE);
+	copies = memalign(ARCH_DMA_MINALIGN, 2 * MICA_ENV_SIZE);
 	if (!copies)
 		recovery("environment buffer unavailable");
-	memset(copies, 0, 2 * MOS_ENV_SIZE);
+	memset(copies, 0, 2 * MICA_ENV_SIZE);
 	slot = read_environment(disk, copies, &records);
 	if (slot < 0)
 		recovery("redundant environment invalid");
@@ -173,13 +173,13 @@ void __noreturn mos_file_boot(void)
 	snprintf(filename, sizeof(filename), "/kernels/%s/boot.itb", selected->kernel);
 	printf("MOS FIT selected: %s; tries left %d\n", mos_deployment_id, selected->tries);
 	if (!fs_set_blk_dev("mmc", "0:2", FS_TYPE_EXT) && !fs_size(filename, &bytes) &&
-	    bytes > 0 && bytes <= MOS_FIT_LIMIT &&
+	    bytes > 0 && bytes <= MICA_FIT_LIMIT &&
 	    !fs_set_blk_dev("mmc", "0:2", FS_TYPE_EXT) &&
-	    !fs_read(filename, MOS_FIT_ADDRESS, 0, bytes, &loaded) && loaded == bytes &&
-	    !fdt_check_header((void *)MOS_FIT_ADDRESS) &&
-	    fdt_totalsize((void *)MOS_FIT_ADDRESS) == bytes) {
+	    !fs_read(filename, MICA_FIT_ADDRESS, 0, bytes, &loaded) && loaded == bytes &&
+	    !fdt_check_header((void *)MICA_FIT_ADDRESS) &&
+	    fdt_totalsize((void *)MICA_FIT_ADDRESS) == bytes) {
 		wdt_reset(watchdog);
-		bootm_boot_start(MOS_FIT_ADDRESS, "ro dm_verity.require_signatures=1 panic=5 rdinit=/init");
+		bootm_boot_start(MICA_FIT_ADDRESS, "ro dm_verity.require_signatures=1 panic=5 rdinit=/init");
 	}
 	if (selected->tries < 0) {
 		selected->tries = 0;

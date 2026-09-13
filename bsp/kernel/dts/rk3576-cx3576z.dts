@@ -37,7 +37,7 @@
  * because a warm reset re-runs the boot chain before the kernel reads the
  * previous boot's bytes -- a region the loader scribbles on is a pstore that
  * is empty exactly when it matters. The boot chain's own addresses, read out
- * of the built u-boot.itb and out of boards/cx3576/boot.cmd:
+ * of the built u-boot.itb and out of boot.cmd:
  *
  *   0x40060000 / 0x400f0000  BL31 segments        (inside the 2 MiB carve-out)
  *   0x40800000               U-Boot proper        (TEXT_BASE; relocates UP)

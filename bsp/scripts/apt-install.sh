@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mos-build-side: container -- this runs inside the BSP builder image, where apt
+# mica-build-side: container -- this runs inside the BSP builder image, where apt
 # is the image's own package manager; there is no apt step on the host.
 #
 # Install the build dependencies a BSP component names, and leave no apt lists

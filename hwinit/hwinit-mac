@@ -1,6 +1,6 @@
 #!/bin/sh
 # Give every eth* whose kernel address is random a stable MAC derived from two
-# hardware facts: the identity named in /etc/mos/mac.conf (seed=<sysfs path>)
+# hardware facts: the identity named in /etc/mica/mac.conf (seed=<sysfs path>)
 # and WHERE THE PORT IS ATTACHED. The eMMC CID is a read-only chip register, so
 # the derived address survives a rootfs reflash and every image update; the
 # port's own path through the bus topology is a property of the board, so it
@@ -10,7 +10,7 @@
 #
 # THE DISCRIMINATOR IS NOT THE INTERFACE NAME, and that is the whole history of
 # this script. It used to hash `seed + ifname`. This board boots net.ifnames=0
-# (boards/cx3576/board.env BOARD_CMDLINE_ARGS), so `eth0` and `eth1` carry no
+# (board.env BOARD_CMDLINE_ARGS), so `eth0` and `eth1` carry no
 # hardware identity at all -- they are the order the two NICs happened to
 # register in. On the first hardware boot (_out/cx3576/a.txt, 2026-09-08) the
 # on-board GMAC registered at 11.6657 s and the PCIe RTL8168 at 11.6711 s, four
@@ -28,15 +28,15 @@
 # below must compute one answer.
 #
 # TWO ENTRY POINTS, and they must agree:
-#   60-mos-mac-stable.rules  one interface name, per `add` event. The only
+#   60-mica-mac-stable.rules  one interface name, per `add` event. The only
 #       thing that can reach a port which appears after boot is under way, and
 #       what makes the assignment ordering-free.
-#   mos-mac.service          no arguments: every eth* that exists at that
+#   mica-mac.service          no arguments: every eth* that exists at that
 #       moment. The cold-plug sweep, ordered before network-pre.target. It is a
 #       backstop, not the mechanism: on this board both NICs register at 11.67 s
 #       and a one-shot that has already run cannot come back for them.
 #
-# The udev path needs 60-mos-mac-stable.link beside it. Without that file
+# The udev path needs 60-mica-mac-stable.link beside it. Without that file
 # systemd's own 99-default.link applies MACAddressPolicy=persistent at
 # 80-net-setup-link.rules, which paints a machine-id-derived address over a
 # NET_ADDR_RANDOM port and leaves addr_assign_type at NET_ADDR_SET -- and a
@@ -47,10 +47,10 @@
 #
 # The three paths below are overridable ONLY so that tests/mac-stable-test.sh
 # can drive this script; on a device none of the variables is set and all three
-# are the literal paths they were before. mos-data-layout and hwinit-gadget take
+# are the literal paths they were before. mica-data-layout and hwinit-gadget take
 # their own for the same reason.
-CONF=${MOS_MAC_CONF:-/etc/mos/mac.conf}
-SYSFS=${MOS_MAC_SYSFS:-/sys}
+CONF=${MICA_MAC_CONF:-/etc/mica/mac.conf}
+SYSFS=${MICA_MAC_SYSFS:-/sys}
 [ -r "$CONF" ] || exit 0
 seed_path=$(sed -n 's/^seed=//p' "$CONF" | head -n1)
 [ -n "$seed_path" ] && [ -r "$seed_path" ] || exit 0

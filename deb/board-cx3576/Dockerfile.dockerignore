@@ -4,7 +4,7 @@
 # the PREPARE hook render.sh, which only the host reads, cannot invalidate
 # this producer's cache when they are edited.
 #
-# The shared rootfs/packages-src/copyright is deliberately not used here,
+# The shared boot/common/copyright is deliberately not used here,
 # since this payload carries vendor firmware and GPL-2.0 kernel modules that
 # it has to record on their own terms.
 *

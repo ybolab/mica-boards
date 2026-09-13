@@ -1,5 +1,5 @@
 #!/bin/bash
-# mos-build-side: container -- run the pinned main loop with deterministic UART input.
+# mica-build-side: container -- run the pinned main loop with deterministic UART input.
 set -euo pipefail
 [ "$#" = 1 ] || { echo 'usage: autoboot.sh UBOOT_SOURCE' >&2; exit 1; }
 source_dir=$(realpath "$1")

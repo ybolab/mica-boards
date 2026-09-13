@@ -1,5 +1,5 @@
 #!/bin/sh
-# Create the CDC ACM debug console gadget described by /etc/mos/gadget.conf and
+# Create the CDC ACM debug console gadget described by /etc/mica/gadget.conf and
 # bind it to the first available UDC. With the OTG port in "otg" role the PHY
 # only enumerates when a host PC is attached, so binding unconditionally is
 # safe: with no host the gadget just sits idle. The serial number is derived
@@ -10,10 +10,10 @@
 # The three paths below are overridable ONLY so that
 # tests/gadget-configfs-test.sh can drive this script; on a device none of the
 # variables is set and all three are the literal paths they were before.
-# mos-data-layout takes MOS_DATA_ROOT for the same reason.
-CONF=${MOS_GADGET_CONF:-/etc/mos/gadget.conf}
-CONFIGFS=${MOS_GADGET_CONFIGFS:-/sys/kernel/config}
-UDC_DIR=${MOS_GADGET_UDC_DIR:-/sys/class/udc}
+# mica-data-layout takes MICA_DATA_ROOT for the same reason.
+CONF=${MICA_GADGET_CONF:-/etc/mica/gadget.conf}
+CONFIGFS=${MICA_GADGET_CONFIGFS:-/sys/kernel/config}
+UDC_DIR=${MICA_GADGET_UDC_DIR:-/sys/class/udc}
 [ -r "$CONF" ] || exit 0
 conf_get() { sed -n "s/^$1=//p" "$CONF" | head -n1; }
 modprobe -q libcomposite 2>/dev/null || true
@@ -27,7 +27,7 @@ if [ ! -d "$g/strings/0x409" ]; then
     printf '%s\n' "$(conf_get vid)" > "$g/idVendor" 2>/dev/null || true
     printf '%s\n' "$(conf_get pid)" > "$g/idProduct" 2>/dev/null || true
     mkdir -p "$g/strings/0x409" "$g/configs/c.1/strings/0x409" 2>/dev/null || true
-    serial=$(sed -n 's/^seed=//p' /etc/mos/mac.conf 2>/dev/null | head -n1)
+    serial=$(sed -n 's/^seed=//p' /etc/mica/mac.conf 2>/dev/null | head -n1)
     serial=$(cat "$serial" 2>/dev/null)
     printf '%.32s\n' "${serial:-cx3576}" > "$g/strings/0x409/serialnumber" 2>/dev/null || true
     printf '%s\n' "$(conf_get manufacturer)" > "$g/strings/0x409/manufacturer" 2>/dev/null || true
@@ -49,7 +49,7 @@ mkdir -p "$g/functions/acm.usb0" 2>/dev/null || exit 0
 # in Documentation/usb/gadget_configfs.rst is relative precisely because it is
 # written to be run after `cd` into the gadget directory.
 #
-# This script runs from mos-gadget.service, a Type=oneshot with no
+# This script runs from mica-gadget.service, a Type=oneshot with no
 # WorkingDirectory=, so its cwd is `/`. The target this line used to pass,
 # `../../functions/acm.usb0`, was therefore resolved as `/functions/acm.usb0`,
 # symlink(2) returned ENOENT, `2>/dev/null || true` swallowed it, and the

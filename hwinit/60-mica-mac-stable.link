@@ -14,7 +14,7 @@
 # boot log).
 #
 # So without this file the addresses of both ports are decided by systemd, not
-# by mos: rooted in the machine ID rather than in the eMMC CID /etc/mos/mac.conf
+# by mos: rooted in the machine ID rather than in the eMMC CID /etc/mica/mac.conf
 # names, and -- when no ID_NET_NAME_* exists -- keyed on `eth0`/`eth1`, which is
 # the probe-order defect this board's stable-MAC assignment exists to remove.
 # The kernel then records the write as NET_ADDR_SET, which hwinit-mac reads as

@@ -1,11 +1,11 @@
 #!/bin/sh
-# Bring up the CAN interface with the parameters from /etc/mos/can.conf
+# Bring up the CAN interface with the parameters from /etc/mica/can.conf
 # (interface=, bitrate=, restart-ms=, fd=). Skips silently when the interface
 # is absent; the down-first makes re-runs idempotent (type-can parameters can
 # only be set while the link is down). fd= is only passed when set, because a
 # controller without CAN FD support rejects the flag even when turning it off.
 # Always exits 0.
-CONF=/etc/mos/can.conf
+CONF=/etc/mica/can.conf
 [ -r "$CONF" ] || exit 0
 conf_get() { sed -n "s/^$1=//p" "$CONF" | head -n1; }
 iface=$(conf_get interface)

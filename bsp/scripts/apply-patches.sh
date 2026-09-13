@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mos-build-side: container -- it patches the vendor tree fetched into the BSP
+# mica-build-side: container -- it patches the vendor tree fetched into the BSP
 # builder image; nothing in this repository's checkout is touched.
 #
 # Apply a patch series to a fetched source tree, in the order the series names.

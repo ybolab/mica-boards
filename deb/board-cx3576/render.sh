@@ -3,11 +3,11 @@
 set -euo pipefail
 src=${1:?source root required}
 out=${2:?output directory required}
-. "$src/boards/cx3576/board.env"
+. "$src/board.env"
 [ "$LAYOUT_VERSION" = 3 ] && [ "$LAYOUT_PARTITIONS" = 'FIRMWARE SYSTEM DATA' ]
 mkdir -p "$out/repart.d" "$out/systemd-repart.service.d"
 printf -v data_line 'PARTUUID=%s /mnt/data ext4 noatime,prjquota,x-systemd.growfs 0 2' "${DATA_GUID,,}"
-sed "s|@DATA_LINE@|$data_line|g" "$src/rootfs/overlay/etc/fstab.in" > "$out/fstab"
+sed "s|@DATA_LINE@|$data_line|g" "$src/common/fstab.in" > "$out/fstab"
 for entry in FIRMWARE SYSTEM DATA; do
     var=${entry}_TYPECODE; type=${!var}
     var=${entry}_PARTNUM; number=${!var}
@@ -24,7 +24,7 @@ cat > "$out/systemd-repart.service.d/10-data.conf" <<EOF
 Before=mnt-data.mount
 [Service]
 ExecStart=
-ExecStart=/usr/lib/mos/mos-grow-data ${SYSTEM_GUID,,} ${DISK_GUID,,}
+ExecStart=/usr/lib/mica/mica-grow-data ${SYSTEM_GUID,,} ${DISK_GUID,,}
 SuccessExitStatus=
 TimeoutStartSec=30
 EOF

@@ -1,10 +1,10 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: mos
-Comment: The copyright file of mos-board-cx3576, installed as
- /usr/share/doc/mos-board-cx3576/copyright.
+Comment: The copyright file of mica-board-cx3576, installed as
+ /usr/share/doc/mica-board-cx3576/copyright.
  .
  It is this board package's OWN file and not the shared
- rootfs/packages-src/copyright, which says in so many words that a producer
+ boot/common/copyright, which says in so many words that a producer
  packaging vendor content does not use it. Four bodies of work ship here and
  each is recorded on its own terms: the repository's rendered configuration,
  hardware-init programs and units; the AIC8800D80 Wi-Fi/Bluetooth firmware;
@@ -14,7 +14,7 @@ Comment: The copyright file of mos-board-cx3576, installed as
  WHERE EACH LICENCE TEXT CAME FROM, stated because a licence record whose
  provenance is unstated cannot be told apart from a guess:
  .
-   Apache-2.0 -- copied verbatim from rootfs/packages-src/copyright, which
+   Apache-2.0 -- copied verbatim from boot/common/copyright, which
    carries this repository's own LICENSE file.
  .
    GPL-2 -- copied verbatim from /usr/share/common-licenses/GPL-2 in the
@@ -24,7 +24,7 @@ Comment: The copyright file of mos-board-cx3576, installed as
    dangle on the device.
  .
    AIC8800D80 firmware and the Rockchip rkbin blobs -- NO LICENCE TEXT EXISTS
-   TO COPY. boards/cx3576/bsp/rootfs/firmware/ holds 32 vendor files and no
+   TO COPY. bsp/rootfs/firmware/ holds 32 vendor files and no
    licence, copyright, notice or README file of any kind, and the rkbin blobs
    are fetched during the U-Boot build from a repository this tree does not
    vendor. Their two stanzas below therefore record what is known and say
@@ -41,18 +41,18 @@ License: AIC8800-firmware-undocumented
 Comment: Vendor binary firmware for the AIC8800D80 Wi-Fi/Bluetooth combo part,
  plus its aic_userconfig_8800d80.txt runtime configuration. Redistributed
  unmodified from the board vendor's BSP drop, committed at
- boards/cx3576/bsp/rootfs/firmware/ and narrowed to the five confirmed
- runtime files by BOARD_FIRMWARE_FILES in boards/cx3576/board.env -- the
+ bsp/rootfs/firmware/ and narrowed to the five confirmed
+ runtime files by BOARD_FIRMWARE_FILES in board.env -- the
  rest of the drop is other AIC parts and other silicon revisions, and only the
  confirmed set may enter a signed root.
 
 Files: usr/lib/modules/*
- usr/lib/mos/board/cx3576/Image
- usr/lib/mos/board/cx3576/rk3576-src.dtb
+ usr/lib/mica/board/cx3576/Image
+ usr/lib/mica/board/cx3576/rk3576-src.dtb
 Copyright: Linus Torvalds and the many contributors to the Linux kernel
 License: GPL-2
 Comment: Built from armbian/linux-rockchip, branch rk-6.1-rkr5.1, kernel
- 6.1.115, pinned by commit in boards/cx3576/bsp/kernel/Dockerfile, with this
+ 6.1.115, pinned by commit in bsp/kernel/Dockerfile, with this
  board's configuration fragments, device tree and patches from that directory.
  Linux is GPL-2.0-only; the Linux-syscall-note exception covers the
  userspace-facing headers and not the modules or the kernel image here.
@@ -61,15 +61,15 @@ Comment: Built from armbian/linux-rockchip, branch rk-6.1-rkr5.1, kernel
  The kernel source is fetched during the build and is not vendored, so that
  tree's own COPYING file is not present to copy from; the corresponding source
  is the pinned upstream commit plus the patch series in
- boards/cx3576/bsp/kernel/patches/.
+ bsp/kernel/patches/.
 
-Files: usr/lib/mos/board/cx3576/u-boot-rockchip.bin
+Files: usr/lib/mica/board/cx3576/u-boot-rockchip.bin
 Copyright: Wolfgang Denk and the many contributors to Das U-Boot
  Rockchip Electronics Co., Ltd.
 License: GPL-2 and Rockchip-rkbin-undocumented
 Comment: A COMPOSITE IMAGE, recorded as one because its halves are not under
  the same terms. U-Boot proper and the SPL are built from u-boot/u-boot
- v2026.07, pinned by commit in boards/cx3576/bsp/uboot/Dockerfile, and are
+ v2026.07, pinned by commit in bsp/uboot/Dockerfile, and are
  GPL-2.0-or-later. Linked into the same file are two Rockchip binary blobs
  taken from rockchip-linux/rkbin at a pinned commit: the RK3576 DDR
  initialisation TPL and the BL31 secure monitor.
@@ -81,7 +81,7 @@ License: AIC8800-firmware-undocumented
  The vendor drop these files come from documents no licence, and none is
  asserted on its behalf here.
  .
- Searched: every file under boards/cx3576/bsp/rootfs/firmware/ (32 of them),
+ Searched: every file under bsp/rootfs/firmware/ (32 of them),
  for a LICENSE, COPYING, NOTICE or README file and for a licence header inside
  the binaries. There is none. The blobs arrived as a bare firmware drop from
  the board vendor.
@@ -95,7 +95,7 @@ License: AIC8800-firmware-undocumented
 License: Rockchip-rkbin-undocumented
  The Rockchip DDR initialisation TPL and BL31 blobs linked into
  u-boot-rockchip.bin come from rockchip-linux/rkbin at a commit pinned in
- boards/cx3576/bsp/uboot/Dockerfile. That repository is fetched during the
+ bsp/uboot/Dockerfile. That repository is fetched during the
  build and is not vendored here, so no licence file from it is present in this
  tree to copy, and none is reproduced.
  .

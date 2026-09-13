@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mos-build-side: container -- this cross-compiles the kernel inside the BSP
+# mica-build-side: container -- this cross-compiles the kernel inside the BSP
 # builder image; docs/design/build.md section 0 is why there is no compiler here.
 #
 # Compile the CX3576-Z kernel, prove the compiled tree carries each patch, and

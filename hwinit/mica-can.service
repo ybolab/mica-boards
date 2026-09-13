@@ -1,10 +1,10 @@
 [Unit]
 Description=Configure CAN interface bitrate
-ConditionPathExists=/etc/mos/can.conf
+ConditionPathExists=/etc/mica/can.conf
 
 [Service]
 Type=oneshot
-ExecStart=/usr/lib/mos/hwinit-can
+ExecStart=/usr/lib/mica/hwinit-can
 TimeoutStartSec=15
 
 [Install]

@@ -1,10 +1,10 @@
 [Unit]
 Description=Set USB OTG port role
-ConditionPathExists=/etc/mos/otg.conf
+ConditionPathExists=/etc/mica/otg.conf
 
 [Service]
 Type=oneshot
-ExecStart=/usr/lib/mos/hwinit-otg
+ExecStart=/usr/lib/mica/hwinit-otg
 TimeoutStartSec=10
 
 [Install]

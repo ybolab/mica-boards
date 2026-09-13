@@ -23,7 +23,7 @@ Upstream-Status: Inappropriate [board integration]
  
  endmenu		# Booting
 +
-+config MOS_FILE_BOOT
++config MICA_FILE_BOOT
 +	bool "MOS fixed signed FIT file boot policy"
 +	depends on ROCKCHIP_RK3576
 +	help

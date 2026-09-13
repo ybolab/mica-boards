@@ -1,7 +1,7 @@
 # bsp — CX3576-Z (Rockchip RK3576)
 
 The board's bootloader and kernel are built here. Each component is a buildkit
-Dockerfile producing finished artifacts under `_out/boards/cx3576/` (RFCT-343
+Dockerfile producing finished artifacts under `_out/` (RFCT-343
 moved them there from `out/` beside this file, so every build product in the
 repository is under one directory); nothing here builds or modifies the mos
 rootfs, which `rootfs/` owns.
@@ -13,16 +13,16 @@ listed in that component's `patches/series`. The gate on that move was byte
 identity: all eleven artefacts came back unchanged.
 
 `Makefile` in this directory drives every target. The repo root delegates to it:
-`make cx3576-<target>` runs `make -C boards/cx3576/bsp <target>`.
+`make cx3576-<target>` runs `make -C bsp <target>`.
 
 ## Layout
 
 - `uboot/` — mainline U-Boot v2026.07 + rkbin blobs -> `u-boot-rockchip.bin` (eMMC sector 64).
-  `make uboot` builds the v1/Alpine debug variant into `_out/boards/cx3576/uboot/`; `make uboot-mos`
+  `make uboot` builds the v1/Alpine debug variant into `_out/uboot/`; `make uboot-mos`
   builds the A/B variant with the redundant environment and the `boot.scr` contract
-  into `_out/boards/cx3576/uboot-mos/`, which is the one the mos image takes
+  into `_out/uboot-mos/`, which is the one the mos image takes
 - `kernel/` — armbian rk-6.1-rkr5.1 (6.1.115): config baseline, in-tree dts, patches -> `Image`, `modules.tar`, `rk3576-src.dtb`.
-  The config must satisfy `boards/common/mos-required.fragment`
+  The config must satisfy `boot/common/mos-required.fragment`
 - `rootfs/` — Alpine demo rootfs (overlay under `alpine/rootfs/`, installed onto `/`)
   + WiFi firmware blobs (AP6275S / AIC8800 dual SKU); the demo image itself
   ships only the verified AIC8800D80 U02 blobs
@@ -30,12 +30,12 @@ identity: all eleven artefacts came back unchanged.
   install, pinned source fetch, series-driven patch application. The U-Boot
   target reaches them through the `bsp-scripts` build context, which is why its
   own build context can stay `uboot/`
-- `init/` — board hardware facts consumed by the `boards/cx3576/hwinit`
+- `init/` — board hardware facts consumed by the `hwinit`
   systemd units
 - `Dockerfile.alpine` — assembles the flashable Alpine debug/demo disk image (extlinux boot)
 
 The Alpine image is the board smoke-test path. The mos image consumes
-`uboot-mos/` and `kernel/` from `_out/boards/cx3576/`, defaulting to that directory and
+`uboot-mos/` and `kernel/` from `_out/`, defaulting to that directory and
 overridable with `BSP_OUT`.
 
 ## Flashing
@@ -48,14 +48,14 @@ board is already in and by which image is being written, not by preference.
 | **Loader** | U-Boot boots and its rockusb gadget enumerates | `make flash` | the whole disk |
 | **Loader, mos image** | the same, and what is being written is the product image | `make flash-mos` | the whole disk |
 | **Maskrom** | U-Boot is absent or broken, board enumerates as Maskrom | `make flash-maskrom` | the whole disk, after pushing the pinned vendor loader |
-| **rootfs only** | kernel and partition layout unchanged | `make flash-rootfs-offline` | `_out/boards/cx3576/rootfs/rootfs.img` at sector 163840 |
+| **rootfs only** | kernel and partition layout unchanged | `make flash-rootfs-offline` | `_out/rootfs/rootfs.img` at sector 163840 |
 | **`ums`** | you are at the U-Boot console | `ums 0 mmc 0`, then `dd` from the host | whatever the host writes |
 | **raw `dd`** | the eMMC or SD is reachable directly | `dd` to the block device | whatever you write |
 
 **Which image.** `make flash` and `make flash-maskrom` write
-`_out/boards/cx3576/disk.img`, the Alpine demo image this directory builds.
+`_out/disk.img`, the Alpine demo image this directory builds.
 `make flash-mos` writes `_out/cx3576/cx3576-mos-latest.img`, the A/B product
-image `make os-image-cx3576` builds at the top level; `MOS_IMAGE=<file>`
+image `make os-image-cx3576` builds at the top level; `MICA_IMAGE=<file>`
 selects another build. That target is here rather than at the top level
 because this Makefile is the only place in the tree that knows how to talk to
 the board.
@@ -84,7 +84,7 @@ enter before U-Boot is running. `CONFIG_CMD_USB_MASS_STORAGE=y` is set in
 
 **There is no `update.img`, deliberately.** The RK packaging format would need
 `afptool` and `rkImageMaker`, which are closed-source SDK binaries this tree
-would have to vendor, and it buys nothing: `_out/boards/cx3576/disk.img` is a whole-disk image
+would have to vendor, and it buys nothing: `_out/disk.img` is a whole-disk image
 carrying every partition, and `rkdeveloptool wl 0` writes it in one step from
 both Loader and Maskrom.
 

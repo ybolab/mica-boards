@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mos-build-side: container -- kconfig and `make olddefconfig` run in the BSP
+# mica-build-side: container -- kconfig and `make olddefconfig` run in the BSP
 # builder image against the vendor tree fetched there; no kernel configuration
 # happens on the host.
 #
@@ -11,7 +11,7 @@
 # THE OUTPUT IS AN ARTEFACT. The .config this leaves behind is exported by
 # kernel/Dockerfile's artifact stage and packaged as /boot/config-<release>, and
 # verify/src/checks-kernel.ts reads it back out of the packed root. It is the
-# only form of boards/common/mos-required.fragment's floor that survives into an
+# only form of boot/common/mos-required.fragment's floor that survives into an
 # assembled image, which is why the assertions below are on the RESOLVED config
 # and not on the committed input.
 set -euo pipefail
@@ -24,7 +24,7 @@ SRC="$1"
 FRAGMENT="$2"
 
 [ -f "${FRAGMENT}" ] || {
-    echo "error: ${FRAGMENT} does not exist. It arrives through the mos-common build context that boards/cx3576/bsp/Makefile wires up; a bare \`docker buildx build\` without it fails here rather than building a kernel with no shared floor" >&2
+    echo "error: ${FRAGMENT} does not exist. It arrives through the mos-common build context that bsp/Makefile wires up; a bare \`docker buildx build\` without it fails here rather than building a kernel with no shared floor" >&2
     exit 1
 }
 
@@ -146,7 +146,7 @@ require '^CONFIG_LOGO_LINUX_CLUT224=y'
 refuse '^CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER=y'
 
 # THE BOARD'S OWN OPTIONS, AND NOTHING ELSE. This loop used to restate 19
-# symbols that boards/common/mos-required.fragment now pins -- BRIDGE, VETH, the
+# symbols that boot/common/mos-required.fragment now pins -- BRIDGE, VETH, the
 # NF_TABLES and NFT_* core, CGROUP_BPF and the NFT_FIB family -- and the fragment
 # loop below asserts every one of them against the same built .config, on both
 # boards. Two lists free to disagree are one list that is not enforced, so the

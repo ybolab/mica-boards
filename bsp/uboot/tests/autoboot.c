@@ -110,6 +110,6 @@ int main(void)
     check_boot(0, ' ');
     check_boot(500, 'x');
     check_boot(990, 3);
-    puts("MOS_AUTOBOOT_PASS: one-second prompt, timeout, any-key/Control-C abort, and boot resume");
+    puts("MICA_AUTOBOOT_PASS: one-second prompt, timeout, any-key/Control-C abort, and boot resume");
     return 0;
 }

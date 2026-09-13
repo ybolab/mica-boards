@@ -1,4 +1,4 @@
-# kernel project context allowlist (context = boards/cx3576/bsp)
+# kernel project context allowlist (context = bsp)
 *
 !scripts/
 !kernel/config/

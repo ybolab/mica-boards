@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# mos-build-side: container -- kernel/Dockerfile runs this in the BSP builder
+# mica-build-side: container -- kernel/Dockerfile runs this in the BSP builder
 # against the committed master, and writes the result over the vendor tree's
 # logo_linux_clut224.ppm. Nothing in this repository's checkout is touched.
 #

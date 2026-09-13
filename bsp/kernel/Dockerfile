@@ -7,12 +7,12 @@
 # the vendor-source edits.
 
 # Digest-pinned from build-env/images.env via build-env/from.sh. Ubuntu rather
-# than mos-build-c: this cross-compiles a vendor tree against the toolchain
-# versions that tree was tested with, and mos-build-c would be a BSP rebuilt
+# than mica-build-c: this cross-compiles a vendor tree against the toolchain
+# versions that tree was tested with, and mica-build-c would be a BSP rebuilt
 # under a toolchain nobody has booted on the hardware. No default, so a build
 # without the value is refused rather than built against an image nobody chose.
-ARG MOS_IMAGE_UBUNTU_2404
-FROM --platform=$BUILDPLATFORM ${MOS_IMAGE_UBUNTU_2404} AS build
+ARG MICA_IMAGE_UBUNTU_2404
+FROM --platform=$BUILDPLATFORM ${MICA_IMAGE_UBUNTU_2404} AS build
 
 COPY scripts/ /bsp/scripts/
 
@@ -64,9 +64,9 @@ COPY kernel/config/kernel-cx3576z.config /ksrc/.config
 COPY --from=mos-common mos-required.fragment /mos-required.fragment
 
 # The verity content anchor, from the named build context `mos-trust`
-# (`--build-context mos-trust=../../../meta/verity`, wired in
-# boards/cx3576/bsp/Makefile, which mints it if it is absent). It is the file
-# boards/common/mos-required.fragment names in CONFIG_SYSTEM_TRUSTED_KEYS, and
+# (`--build-context mos-trust=../meta/verity`, wired in
+# bsp/Makefile, which mints it if it is absent). It is the file
+# boot/common/mos-required.fragment names in CONFIG_SYSTEM_TRUSTED_KEYS, and
 # certs/Makefile resolves that relative path against the source tree. Public
 # material only: an X.509 certificate goes in, the private half never leaves
 # meta/. configure.sh asserts both the value and this file.
@@ -96,7 +96,7 @@ RUN bash /bsp/kernel/configure.sh /ksrc /mos-required.fragment
 # reads a clock, and every artefact these values stabilise is produced below.
 ENV KBUILD_BUILD_TIMESTAMP="@1577836800" \
     KBUILD_BUILD_USER=mos \
-    KBUILD_BUILD_HOST=mos-build \
+    KBUILD_BUILD_HOST=mica-build \
     SOURCE_DATE_EPOCH=1577836800
 
 ARG KERNEL_EXPECT=6.1.115
@@ -110,7 +110,7 @@ RUN python3 /bsp/kernel/export-regdb-certs.py /ksrc /regdb-certs.pem
 # what olddefconfig decided over the board config merged with the common
 # fragment, and the only form of the `=y` floor the image contract can read back
 # out of a packed root. Before RFCT-343 this board exported none, so a stale
-# _out/boards/cx3576/kernel shipped a kernel predating symbols the fragment had
+# _out/kernel shipped a kernel predating symbols the fragment had
 # gained, with no check going red. kernel.release names the config downstream so
 # it and the modules beside it cannot come from different kernels unnoticed.
 #
@@ -129,7 +129,7 @@ RUN python3 /bsp/kernel/export-regdb-certs.py /ksrc /regdb-certs.pem
 # build.sh sizes both in the log, and a tree that wants it rebuilds with this
 # Dockerfile and reads it out of the cached build stage in seconds.
 #
-# NOT SHIPPED TO THE DEVICE. boards/cx3576/deb/board-cx3576/render.sh stages
+# NOT SHIPPED TO THE DEVICE. deb/board-cx3576/render.sh stages
 # named files -- the boot slot's own list, modules.tar, config, kernel.release
 # -- so a new file in this export reaches the package only when that list names
 # it, and this one is not in it.

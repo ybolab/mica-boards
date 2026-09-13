@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mos-build-side: container -- U-Boot is cross-compiled inside the BSP builder
+# mica-build-side: container -- U-Boot is cross-compiled inside the BSP builder
 # image; docs/design/build.md section 0 is why there is no compiler on the host.
 #
 # Configure and build the CX3576-Z U-Boot, debug variant (ENV_IS_NOWHERE).

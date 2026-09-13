@@ -3,20 +3,20 @@
 # Layout: U-Boot at LBA 64, boot at 16 MiB, and rootfs at 80 MiB.
 
 # THE BUILDER IMAGE, INJECTED FROM build-env/images.env by
-# build-env/from.sh, which boards/cx3576/bsp/Makefile calls. A bare tag like
+# build-env/from.sh, which bsp/Makefile calls. A bare tag like
 # `ubuntu:24.04` is one Canonical repoints on every point release, so the answer
 # to "which toolchain produced this artefact" would be the date of the build.
 #
-# UBUNTU AND NOT mos-build-c: the BSP builders get digest pins only. This
+# UBUNTU AND NOT mica-build-c: the BSP builders get digest pins only. This
 # cross-compiles a vendor tree against gcc-aarch64-linux-gnu,
 # python3-pyelftools, swig and device-tree-compiler at the versions that tree
-# was tested with, and moving it onto mos-build-c would be a BSP rebuilt under
+# was tested with, and moving it onto mica-build-c would be a BSP rebuilt under
 # a toolchain nobody has booted on the hardware.
 #
 # NO DEFAULT: without a value docker refuses before any stage runs, which is
 # loud; with one it would build green against an image nobody chose.
-ARG MOS_IMAGE_UBUNTU_2404
-FROM --platform=$BUILDPLATFORM ${MOS_IMAGE_UBUNTU_2404} AS assemble
+ARG MICA_IMAGE_UBUNTU_2404
+FROM --platform=$BUILDPLATFORM ${MICA_IMAGE_UBUNTU_2404} AS assemble
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \

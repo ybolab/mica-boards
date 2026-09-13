@@ -1,10 +1,10 @@
 [Unit]
 Description=Load board hardware modules
-ConditionPathExists=/etc/mos/modules.conf
+ConditionPathExists=/etc/mica/modules.conf
 
 [Service]
 Type=oneshot
-ExecStart=/usr/lib/mos/hwinit-modules
+ExecStart=/usr/lib/mica/hwinit-modules
 TimeoutStartSec=30
 
 [Install]

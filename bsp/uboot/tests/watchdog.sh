@@ -1,5 +1,5 @@
 #!/bin/bash
-# mos-build-side: container -- exercise the pinned drivers with simulated MMIO.
+# mica-build-side: container -- exercise the pinned drivers with simulated MMIO.
 set -euo pipefail
 [ "$#" = 1 ] || { echo 'usage: watchdog.sh UBOOT_SOURCE' >&2; exit 1; }
 source_dir=$(realpath "$1")

@@ -9,13 +9,13 @@
 # engineer than no indicator at all.
 #
 # Upstream expresses the same semantics for the Alpine v1 demo as an OpenRC
-# service (boards/cx3576/bsp/rootfs/alpine/rootfs/etc/init.d/status-led). There is
+# service (bsp/rootfs/alpine/rootfs/etc/init.d/status-led). There is
 # no upstream systemd rootfs and therefore no unit to port: the semantics are
 # taken from there, the expression is this repository's own.
 #
-# Usage: mos-status-led start|stop
-#   start   boot red   -> ready blue     (mos-status-led.service ExecStart)
-#   stop    ready blue -> shutdown red   (mos-status-led.service ExecStop)
+# Usage: mica-status-led start|stop
+#   start   boot red   -> ready blue     (mica-status-led.service ExecStart)
+#   stop    ready blue -> shutdown red   (mica-status-led.service ExecStop)
 #
 # Failure is LOUD, in both directions. If a brightness attribute is missing or
 # unwritable the script exits non-zero, so the unit shows up in
@@ -33,7 +33,7 @@ RED=/sys/class/leds/status-red/brightness
 BLUE=/sys/class/leds/status-blue/brightness
 
 fail() {
-    echo "mos-status-led: FAIL $*" >&2
+    echo "mica-status-led: FAIL $*" >&2
     exit 1
 }
 
@@ -63,6 +63,6 @@ stop)
     led_off "${BLUE}"
     ;;
 *)
-    fail "usage: mos-status-led start|stop"
+    fail "usage: mica-status-led start|stop"
     ;;
 esac

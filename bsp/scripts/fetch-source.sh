@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mos-build-side: container -- this clones into the BSP builder image's own
+# mica-build-side: container -- this clones into the BSP builder image's own
 # filesystem; no upstream source tree is fetched onto the host.
 #
 # Fetch one upstream tree at one commit, and prove it is that commit.

@@ -10,7 +10,7 @@
 # =============================================================================
 
 # THE TWO BASE IMAGES, INJECTED FROM build-env/images.env by
-# build-env/from.sh, which boards/cx3576/bsp/Makefile calls. That is the one
+# build-env/from.sh, which bsp/Makefile calls. That is the one
 # place answering "what does this repository build on"; a pin written beside
 # its own FROM is a pin only that FROM's author reads.
 #
@@ -18,9 +18,9 @@
 # DEFAULT is a pin any caller can silently replace, and a caller that forgets
 # the argument builds against something else with no error at all. Without a
 # default docker refuses before the first stage runs.
-ARG MOS_IMAGE_ALPINE_3_24_1
-ARG MOS_IMAGE_UBUNTU_2404
-FROM ${MOS_IMAGE_ALPINE_3_24_1} AS rootfs
+ARG MICA_IMAGE_ALPINE_3_24_1
+ARG MICA_IMAGE_UBUNTU_2404
+FROM ${MICA_IMAGE_ALPINE_3_24_1} AS rootfs
 
 RUN apk add --no-cache \
         openrc busybox-openrc busybox-mdev-openrc \
@@ -44,7 +44,7 @@ RUN echo 'root:root' | chpasswd && \
     chmod 0440 /etc/sudoers.d/wheel && \
     visudo -cf /etc/sudoers
 
-# Kernel modules must come from the same build as _out/boards/cx3576/kernel/Image. Named
+# Kernel modules must come from the same build as _out/kernel/Image. Named
 # contexts support COPY, so extract the tarball in one explicit build step.
 COPY --from=kernel-out modules.tar /tmp/modules.tar
 RUN tar -xf /tmp/modules.tar -C / && rm /tmp/modules.tar
@@ -127,7 +127,7 @@ RUN test -x /sbin/dhcpcd && \
     grep -qx 'PermitRootLogin yes' /etc/ssh/sshd_config.d/10-rk3576-debug.conf && \
     test -x /usr/bin/btmgmt
 
-FROM --platform=$BUILDPLATFORM ${MOS_IMAGE_UBUNTU_2404} AS pack
+FROM --platform=$BUILDPLATFORM ${MICA_IMAGE_UBUNTU_2404} AS pack
 RUN apt-get update && apt-get install -y --no-install-recommends e2fsprogs ripgrep \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=rootfs / /rootfs/
