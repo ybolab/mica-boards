@@ -5,7 +5,8 @@ Maintainer: mos build <mos@example.invalid>
 Section: admin
 Priority: optional
 Depends: mica-system
-Conflicts: mica-board-cx3576, mica-board-s905x5m, mica-board-x64
+Provides: mica-board
+Conflicts: mica-board
 Description: mos virt-arm64-proof three-partition storage policy
  DATA mount and growth, read-only ESP mount and fixed SYSTEM geometry.
  Kernel, verified support image and boot firmware are separate artifacts.
