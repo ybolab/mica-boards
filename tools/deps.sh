@@ -60,7 +60,6 @@ done
 # ---- the OCI client (build-env/deb/oci.sh, verbatim) ----
 OCI_EMPTY_CONFIG_DIGEST=sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
 OCI_MANIFEST_TYPE=application/vnd.oci.image.manifest.v1+json
-declare -A OCI_BEARER=()
 
 oci_load() { # from MICA_REGISTRY (and MICA_REGISTRY_PLAIN_HTTP=1 for a test registry)
     [[ "${MICA_REGISTRY}" =~ ^([A-Za-z0-9.-]+(:[0-9]+)?)/([A-Za-z0-9][A-Za-z0-9._/-]*[A-Za-z0-9])$ ]] || {
@@ -130,31 +129,38 @@ oci_require_public() { # <repo> <ref>
 }
 
 # A bearer for <repo> with <actions> (pull | pull,push), from the challenge
-# the registry gives an unauthenticated request; empty when it gives none.
+# the registry gives an unauthenticated request: "200 <bearer>" (the bearer
+# empty when the registry does not challenge), or the token endpoint's own
+# status and no bearer -- 401/403 when it refuses, 000 when it cannot be
+# reached -- so a refusal reaches the caller as what it is.
 oci_bearer() {
-    local repo="$1" actions="$2" key="$1 $2" challenge realm service out
-    [ -z "${OCI_BEARER[${key}]+x}" ] || { printf '%s' "${OCI_BEARER[${key}]}"; return 0; }
+    local repo="$1" actions="$2" challenge realm service out code token cred=()
     challenge="$(curl -sS --max-time 60 -o /dev/null -D - "${OCI_URL}/v2/${repo}/tags/list" 2>/dev/null | tr -d '\r' | grep -i '^www-authenticate: bearer' || true)"
-    if [ -z "${challenge}" ]; then OCI_BEARER["${key}"]=""; return 0; fi
+    [ -n "${challenge}" ] || { printf '200 \n'; return 0; }
     realm="$(printf '%s' "${challenge}" | sed -n 's/.*realm="\([^"]*\)".*/\1/p')"
     service="$(printf '%s' "${challenge}" | sed -n 's/.*service="\([^"]*\)".*/\1/p')"
-    [ -n "${realm}" ] || { echo "error: ${OCI_HOST} challenged with no realm: ${challenge}" >&2; return 1; }
+    [ -n "${realm}" ] || { echo "error: ${OCI_HOST} challenged with no realm: ${challenge}" >&2; printf '000 \n'; return 0; }
     # With a token, as that identity; without one, anonymously -- a public
-    # artifact is read that way, and a private one answers 401/403 below.
-    local cred=()
+    # artifact is read that way, and a private one is refused here.
     [ -z "${REGISTRY_TOKEN:-}" ] || cred=(-u "${MICA_REGISTRY_USER}:${REGISTRY_TOKEN}")
-    out="$(curl -sS --max-time 60 "${cred[@]}" \
-        --get --data-urlencode "service=${service}" --data-urlencode "scope=repository:${repo}:${actions}" "${realm}" 2>/dev/null || true)"
-    OCI_BEARER["${key}"]="$(printf '%s' "${out}" | jq -r '.token // .access_token // empty' 2>/dev/null || true)"
-    [ -n "${OCI_BEARER[${key}]}" ] || { echo "error: ${realm} issued no token for repository:${repo}:${actions}${REGISTRY_TOKEN:+; ${MICA_RELEASE_TOKEN_VAR} does not grant it} (${actions} on ${OCI_HOST}/${repo})" >&2; return 1; }
-    printf '%s' "${OCI_BEARER[${key}]}"
+    out="$(mktemp)"
+    code="$(curl -sS --max-time 60 -o "${out}" -w '%{http_code}' "${cred[@]}" \
+        --get --data-urlencode "service=${service}" --data-urlencode "scope=repository:${repo}:${actions}" "${realm}" 2>/dev/null || echo 000)"
+    token="$(jq -r '.token // .access_token // empty' "${out}" 2>/dev/null || true)"
+    rm -f "${out}"
+    if [ "${code}" = 200 ] && [ -n "${token}" ]; then printf '200 %s\n' "${token}"; return 0; fi
+    [ "${code}" != 200 ] || code=000
+    echo "error: ${realm} answered ${code} for repository:${repo}:${actions}, issuing no token${REGISTRY_TOKEN:+; ${MICA_RELEASE_TOKEN_VAR} does not grant it}${REGISTRY_TOKEN:- (anonymously: the package is private or does not exist)}" >&2
+    printf '%s \n' "${code}"
 }
 
 # <method> <repo> <actions> <path-under-v2/repo> <out> [curl args] -> status
 oci_request() {
     local method="$1" repo="$2" actions="$3" path="$4" out="$5"; shift 5
-    local bearer auth=()
-    bearer="$(oci_bearer "${repo}" "${actions}")" || return 1
+    local line bearer auth=()
+    line="$(oci_bearer "${repo}" "${actions}")"
+    [ "${line%% *}" = 200 ] || { printf '%s' "${line%% *}"; return 0; }
+    bearer="${line#* }"
     [ -z "${bearer}" ] || auth=(-H "Authorization: Bearer ${bearer}")
     curl -sS --max-time 1800 -o "${out}" -w '%{http_code}' -X "${method}" "${auth[@]}" "$@" "${OCI_URL}/v2/${repo}/${path}" 2>/dev/null || echo 000
 }
@@ -215,8 +221,10 @@ oci_blob_put() {
     [ -n "${location}" ] || { echo "error: the upload to ${OCI_HOST}/${repo} came with no Location" >&2; rm -f "${out}"; return 1; }
     case "${location}" in /*) location="${OCI_URL}${location}" ;; esac
     case "${location}" in *\?*) location="${location}&digest=${digest}" ;; *) location="${location}?digest=${digest}" ;; esac
-    local bearer auth=()
-    bearer="$(oci_bearer "${repo}" pull,push)" || return 1
+    local line bearer auth=()
+    line="$(oci_bearer "${repo}" pull,push)"
+    [ "${line%% *}" = 200 ] || { echo "error: uploading ${digest} to ${OCI_HOST}/${repo}: the token endpoint answered ${line%% *}" >&2; rm -f "${out}"; return 1; }
+    bearer="${line#* }"
     [ -z "${bearer}" ] || auth=(-H "Authorization: Bearer ${bearer}")
     status="$(curl -sS --max-time 1800 -o "${out}" -w '%{http_code}' -X PUT "${auth[@]}" -H 'Content-Type: application/octet-stream' --data-binary "@${file}" "${location}" 2>/dev/null || echo 000)"
     [ "${status}" = 201 ] || { echo "error: uploading ${digest} to ${OCI_HOST}/${repo} answered HTTP ${status}: $(head -c 200 "${out}")" >&2; rm -f "${out}"; return 1; }
