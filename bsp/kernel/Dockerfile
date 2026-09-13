@@ -4,8 +4,8 @@
 # The builder image is injected from build-env/images.env by the BSP
 # Makefile. There is no default: an omitted pin must fail before the build can
 # silently choose a mutable tag.
-ARG MOS_IMAGE_UBUNTU_2404
-FROM --platform=$BUILDPLATFORM ${MOS_IMAGE_UBUNTU_2404} AS build
+ARG MICA_IMAGE_UBUNTU_2404
+FROM --platform=$BUILDPLATFORM ${MICA_IMAGE_UBUNTU_2404} AS build
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -81,11 +81,11 @@ COPY kernel/config/wireless.fragment /wireless.fragment
 COPY kernel/config/signed-boot.fragment /signed-boot.fragment
 COPY --from=mos-trust signer.cert.pem /ksrc/certs/mos-verity-anchor.pem
 COPY kernel/dts/s7d_s905x5m_m100.dts /ksrc/common_drivers/arch/arm64/boot/dts/amlogic/
-# Shared mos runtime baseline from boards/common/. The named context is
+# Shared mos runtime baseline from boot/common/. The named context is
 # wired by the BSP Makefile; a bare build without it fails at this COPY.
 COPY --from=mos-common mos-required.fragment /mos-required.fragment
 
-ENV KBUILD_BUILD_TIMESTAMP="@1577836800" KBUILD_BUILD_USER=mos KBUILD_BUILD_HOST=mos-build SOURCE_DATE_EPOCH=1577836800
+ENV KBUILD_BUILD_TIMESTAMP="@1577836800" KBUILD_BUILD_USER=mos KBUILD_BUILD_HOST=mica-build SOURCE_DATE_EPOCH=1577836800
 
 ARG KERNEL_EXPECT=6.12.38-m100-arm64
 # The first fixed-string lookup is a positive control against the final

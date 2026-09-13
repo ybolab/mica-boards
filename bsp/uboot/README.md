@@ -19,7 +19,7 @@ private MOS signing keys. The required configuration key is embedded with
 export gate decompresses BL33 from each FIP and compares it with the rebuilt
 U-Boot containing the final control FDT.
 
-Outputs under `_out/boards/s905x5m/uboot/` include `u-boot.bin.signed`,
+Outputs under `_out/uboot/` include `u-boot.bin.signed`,
 `u-boot.bin.sd.bin.signed`, `DDR.USB`, `u-boot.dtb`, `config` and host FIT tools.
 The `.signed` suffix describes the vendor boot-chain packaging; physical
 hardware-rooted enforcement is not claimed by this development port.
@@ -56,7 +56,7 @@ is handed off through `/chosen/mos,deployment-id`.
 ## Recovery package
 
 `make s905x5m-uboot-package` packages the existing three BSP artifacts into
-`_out/boards/s905x5m/uboot-package/update.img`, with the manual
+`_out/uboot-package/update.img`, with the manual
 `aml_sdc_burn.ini` sidecar and SHA-256 record. It does not rebuild firmware or
 write a device. The package round-trip gate checks exact bootloader bytes.
 
@@ -68,4 +68,4 @@ perform bootloader maintenance, and the generic firmware-maintain command
 refuses this board until a dedicated Amlogic maintenance transport is qualified.
 
 Physical installation, boot0 selection, watchdog handoff and peripheral behavior
-remain subject to the [board dossier](../../../../docs/boards/s905x5m.md).
+remain subject to the [board dossier](../../docs/boards/s905x5m.md).

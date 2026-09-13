@@ -1,8 +1,8 @@
-Package: mos-s905x5m-bluetooth
+Package: mica-s905x5m-bluetooth
 Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: mos build <mos@example.invalid>
 Section: admin
 Priority: optional
-Depends: mos-bluetooth (= @VERSION@), mos-s905x5m-wireless (= @VERSION@), ${shlibs:Depends}
+Depends: mica-bluetooth, mica-s905x5m-wireless (= @VERSION@), ${shlibs:Depends}
 Description: Seekwave Bluetooth controller bridge for S905X5M

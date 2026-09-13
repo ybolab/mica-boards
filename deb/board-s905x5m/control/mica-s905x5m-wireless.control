@@ -1,8 +1,8 @@
-Package: mos-s905x5m-wireless
+Package: mica-s905x5m-wireless
 Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: mos build <mos@example.invalid>
 Section: admin
 Priority: optional
-Depends: mos-board-s905x5m (= @VERSION@), kmod
+Depends: mica-board-s905x5m (= @VERSION@), kmod
 Description: Seekwave SDIO rail and transport initialization

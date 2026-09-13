@@ -1,23 +1,23 @@
 .PHONY: kernel uboot fit-tools uboot-package uboot-package-test userland
 
-BSP_OUT ?= ../../../_out/boards/s905x5m
-FROM_SH := ../../../build-env/from.sh
-UBUNTU_ARG := MOS_IMAGE_UBUNTU_2404=IMAGE_UBUNTU_2404
-DEBIAN_ARG := MOS_IMAGE_DEBIAN_TRIXIE=IMAGE_DEBIAN_TRIXIE
+BSP_OUT ?= ../_out/bsp
+FROM_SH := ../build-env/from.sh
+UBUNTU_ARG := MICA_IMAGE_UBUNTU_2404=IMAGE_UBUNTU_2404
+DEBIAN_ARG := MICA_IMAGE_DEBIAN_TRIXIE=IMAGE_DEBIAN_TRIXIE
 UBOOT_ARTIFACTS := $(BSP_OUT)/uboot/u-boot.bin.signed \
 	$(BSP_OUT)/uboot/u-boot.bin.sd.bin.signed \
 	$(BSP_OUT)/uboot/DDR.USB
 UBOOT_PACKAGE_DIR := $(BSP_OUT)/uboot-package
 
-VERITY_TRUST_CERT ?= ../../../meta/verity/signer.cert.pem
+VERITY_TRUST_CERT ?= ../meta/verity/signer.cert.pem
 FIT_TRUST_CERT ?=
-VERITY_TOOL := ../../../pkgs/mos-boot/verity-tool.sh
+VERITY_TOOL := ../boot/verity-tool.sh
 
 kernel:
 	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(VERITY_TRUST_CERT)" "$(BSP_OUT)/verity-trust")" && \
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
 	docker buildx build --label ai-agent=true -t ai-agent/mos-s905x5m-kernel \
-	  --build-context mos-common=../../common --build-context "mos-trust=$$TRUST_DIR" -f kernel/Dockerfile $$IMG \
+	  --build-context mos-common=../boot/common --build-context "mos-trust=$$TRUST_DIR" -f kernel/Dockerfile $$IMG \
 	  $(if $(KERNEL_REPO),--build-arg KERNEL_REPO=$(KERNEL_REPO)) \
 	  $(if $(KERNEL_COMMIT),--build-arg KERNEL_COMMIT=$(KERNEL_COMMIT)) \
 	  $(if $(KERNEL_EXPECT),--build-arg KERNEL_EXPECT=$(KERNEL_EXPECT)) \
@@ -33,7 +33,7 @@ uboot:
 	TRUST_DIR="$$(bash $(VERITY_TOOL) stage "$(FIT_TRUST_CERT)" "$(BSP_OUT)/fit-trust")" && \
 	IMG="$$(bash $(FROM_SH) $(UBUNTU_ARG))" && \
 	docker buildx build --label ai-agent=true -t ai-agent/mos-s905x5m-uboot \
-	  --build-context mos-common=../../common --build-context "mos-boot-trust=$$TRUST_DIR" \
+	  --build-context mos-common=../boot/common --build-context "mos-boot-trust=$$TRUST_DIR" \
 	  -f uboot/Dockerfile $$IMG \
 	  $(if $(UBOOT_REPO),--build-arg UBOOT_REPO=$(UBOOT_REPO)) \
 	  $(if $(UBOOT_COMMIT),--build-arg UBOOT_COMMIT=$(UBOOT_COMMIT)) \
@@ -41,11 +41,11 @@ uboot:
 
 fit-tools:
 	@test -x "$(BSP_OUT)/uboot/tools/fit_check_sign"
-	$(MAKE) -C ../../.. os-boot-tools
+	bash ../boot/build-tools.sh
 	docker build --label ai-agent=true -t ai-agent/mos-fit-tools-amd64 \
-	  --build-arg MOS_BOOT_TOOLS=ai-agent/mos-boot-tools-amd64 \
+	  --build-arg MICA_BOOT_TOOLS=ai-agent/mos-boot-tools-amd64 \
 	  --build-context fit-tools=$(BSP_OUT)/uboot/tools \
-	  -f ../../../pkgs/mos-boot/Dockerfile.fit ../../../pkgs/mos-boot
+	  -f ../boot/Dockerfile.fit ../boot
 
 # Packaging is a separate consumer of the section-3 U-Boot artifact interface.
 # It deliberately does not rebuild U-Boot: first produce the three artifacts

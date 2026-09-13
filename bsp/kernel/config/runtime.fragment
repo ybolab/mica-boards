@@ -1,5 +1,5 @@
 # Board-specific runtime additions. The common boot and security floor lives
-# only in boards/common/mos-required.fragment. Native netavark nftables,
+# only in boot/common/mos-required.fragment. Native netavark nftables,
 # conntrack, NAT, FIB and veth requirements belong to that shared floor.
 
 # Retained vendor/iptables-compatibility netfilter options. They are not part

@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
 # Package the section-3 s905x5m U-Boot artifacts as an Amlogic v2 container.
 
-ARG MOS_IMAGE_DEBIAN_TRIXIE
-FROM --platform=linux/386 ${MOS_IMAGE_DEBIAN_TRIXIE} AS packer
+ARG MICA_IMAGE_DEBIAN_TRIXIE
+FROM --platform=linux/386 ${MICA_IMAGE_DEBIAN_TRIXIE} AS packer
 
 ARG PACKER_URL=https://raw.githubusercontent.com/khadas/utils/09fd7ae034f340462cab1daf332a012924a1efa9/aml_image_v2_packer
 ARG PACKER_SHA256=7511fb8d1a483d606d67bcb87ae20ab0821fbaff797ad6da958903e46fb4ed9a

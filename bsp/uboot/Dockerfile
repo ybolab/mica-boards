@@ -4,8 +4,8 @@
 # The base image is injected from build-env/images.env by the BSP Makefile.
 # There is no default: omitting the repository pin must fail before the build
 # can silently select a mutable image tag.
-ARG MOS_IMAGE_UBUNTU_2404
-FROM --platform=$BUILDPLATFORM ${MOS_IMAGE_UBUNTU_2404} AS build
+ARG MICA_IMAGE_UBUNTU_2404
+FROM --platform=$BUILDPLATFORM ${MICA_IMAGE_UBUNTU_2404} AS build
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \

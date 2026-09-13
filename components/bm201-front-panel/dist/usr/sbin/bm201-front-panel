@@ -72,7 +72,7 @@ update_panel()
 		return 1
 	fi
 
-	zone_file=${BM201_TIMEZONE_FILE:-/run/mos/timezone}
+	zone_file=${BM201_TIMEZONE_FILE:-/run/mica/timezone}
 	if [ -r "$zone_file" ]; then
 		zone=$(cat "$zone_file")
 		clock=$(TZ="$zone" date '+%H%M %S' 2>/dev/null) || clock=

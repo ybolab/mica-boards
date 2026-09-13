@@ -9,26 +9,26 @@ Files: usr/lib/modules/* Image s7d_s905x5m_m100.dtb
 Copyright: Linux kernel contributors and Amlogic
 License: GPL-2
 Comment: Corresponding source is hardkernel/linux at the commit pinned in
- boards/s905x5m/bsp/kernel/Dockerfile, its pinned common_drivers and media_modules
+ bsp/kernel/Dockerfile, its pinned common_drivers and media_modules
  submodules, and the configuration and patches in that BSP directory.
 
 Files: usr/lib/firmware/*
 Copyright: Seekwave Technology
 License: Vendor-firmware-undocumented
-Comment: Unmodified binary inputs from boards/s905x5m/bsp/rootfs/firmware.
+Comment: Unmodified binary inputs from bsp/rootfs/firmware.
  No redistribution license text accompanies these firmware inputs in this tree.
 
 Files: usr/lib/bluetooth/plugins/libskwbt.so
 Copyright: 2020-2021 SeekWave Technology
 License: Apache-2.0
-Comment: Built from boards/s905x5m/bsp/userland/skwbt. The library source
+Comment: Built from bsp/userland/skwbt. The library source
  headers state Apache-2.0. The bridge source is in the adjacent skw_bridge tree.
 
 Files: etc/bluetooth/*.nvbin
 Copyright: Seekwave Technology
 License: Vendor-firmware-undocumented
 Comment: Unmodified controller configuration binaries from
- boards/s905x5m/bsp/userland/skwbt/bluetooth_conf, without documented terms.
+ bsp/userland/skwbt/bluetooth_conf, without documented terms.
 
 License: Apache-2.0
  Licensed under the Apache License, Version 2.0 (the "License");

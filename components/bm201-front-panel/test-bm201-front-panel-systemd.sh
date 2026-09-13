@@ -3,13 +3,13 @@
 set -eu
 
 script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
-repo_root=$(CDPATH= cd "$script_dir/../../../../" && pwd)
+repo_root=$(CDPATH= cd "$script_dir/../../" && pwd)
 dist=$script_dir/dist
 program=$dist/usr/sbin/bm201-front-panel
-stop_helper=$dist/usr/lib/mos/bm201-front-panel-stop
+stop_helper=$dist/usr/lib/mica/bm201-front-panel-stop
 service=$dist/usr/lib/systemd/system/bm201-front-panel.service
 drop_in=$dist/usr/lib/systemd/system/multi-user.target.d/bm201-front-panel.conf
-board_env=$repo_root/boards/s905x5m/board.env
+board_env=$repo_root/board.env
 test_tmp=$(mktemp -d "${TMPDIR:-/tmp}/bm201-front-panel-systemd.XXXXXX")
 
 cleanup()
@@ -69,7 +69,7 @@ assert_line 'After=time-sync.target network-online.target' "$service" \
 assert_line '[Service]' "$service" "service section"
 assert_line 'Type=simple' "$service" "service type"
 assert_line 'ExecStart=/usr/sbin/bm201-front-panel' "$service" "service command"
-assert_line 'ExecStopPost=/usr/lib/mos/bm201-front-panel-stop' "$service" \
+assert_line 'ExecStopPost=/usr/lib/mica/bm201-front-panel-stop' "$service" \
 	"explicit stop command"
 assert_line 'Restart=no' "$service" "optional panel does not restart-loop"
 assert_line '[Install]' "$service" "install section"

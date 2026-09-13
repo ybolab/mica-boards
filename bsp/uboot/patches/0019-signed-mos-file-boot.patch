@@ -5,7 +5,7 @@
  	  the presence of the simple frame buffer with associated reserved
  	  memory
 +
-+config MOS_FILE_BOOT
++config MICA_FILE_BOOT
 +	bool "Fixed signed MOS file boot"
 +	depends on FIT_SIGNATURE && ENV_IS_NOWHERE
 --- a/bl33/v2023/common/Makefile

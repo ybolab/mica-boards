@@ -3,8 +3,8 @@
 # The sources are the minimal runtime set imported from s905x5m-alpine commit
 # 49618bed07508b77bb8e8e640e0faafc5c95ea9a.
 
-ARG MOS_IMAGE_DEBIAN_TRIXIE
-FROM --platform=$TARGETPLATFORM ${MOS_IMAGE_DEBIAN_TRIXIE} AS build
+ARG MICA_IMAGE_DEBIAN_TRIXIE
+FROM --platform=$TARGETPLATFORM ${MICA_IMAGE_DEBIAN_TRIXIE} AS build
 ARG TARGETARCH
 
 RUN test "$TARGETARCH" = arm64 && \

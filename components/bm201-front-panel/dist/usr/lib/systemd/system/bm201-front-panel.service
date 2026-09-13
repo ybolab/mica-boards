@@ -6,7 +6,7 @@ After=time-sync.target network-online.target
 [Service]
 Type=simple
 ExecStart=/usr/sbin/bm201-front-panel
-ExecStopPost=/usr/lib/mos/bm201-front-panel-stop
+ExecStopPost=/usr/lib/mica/bm201-front-panel-stop
 Restart=no
 
 [Install]
