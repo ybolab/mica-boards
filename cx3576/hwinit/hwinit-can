@@ -1,0 +1,21 @@
+#!/bin/sh
+# Bring up the CAN interface with the parameters from /etc/mica/can.conf
+# (interface=, bitrate=, restart-ms=, fd=). Skips silently when the interface
+# is absent; the down-first makes re-runs idempotent (type-can parameters can
+# only be set while the link is down). fd= is only passed when set, because a
+# controller without CAN FD support rejects the flag even when turning it off.
+# Always exits 0.
+CONF=/etc/mica/can.conf
+[ -r "$CONF" ] || exit 0
+conf_get() { sed -n "s/^$1=//p" "$CONF" | head -n1; }
+iface=$(conf_get interface)
+bitrate=$(conf_get bitrate)
+restart_ms=$(conf_get restart-ms)
+fd=$(conf_get fd)
+[ -n "$iface" ] && [ -d "/sys/class/net/$iface" ] || exit 0
+ip link set "$iface" down 2>/dev/null || true
+set -- type can bitrate "${bitrate:-500000}" restart-ms "${restart_ms:-100}"
+[ -n "$fd" ] && set -- "$@" fd "$fd"
+ip link set "$iface" "$@" 2>/dev/null || true
+ip link set "$iface" up 2>/dev/null || true
+exit 0

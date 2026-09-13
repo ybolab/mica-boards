@@ -1,0 +1,3 @@
+# Keep tty1 idle for the HDMI boot logo. A disabled template remains startable;
+# logind reserves tty2 and starts its authenticated getty when Alt+F2 is pressed.
+disable getty@.service

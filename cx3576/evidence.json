@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 2,
+  "board": "cx3576",
+  "revision": "all",
+  "bootAssurance": "I1",
+  "qualification": "Current signed file deployments: required signed root/support verity, authenticated metadata and component installation. Required FIT configuration signatures and actual firmware C persistence-failure tests pass; physical cx3576 boot, power-cut, watchdog and USB flash remain pending. Development signing inputs only; conservative I1 board grade retained pending physical/operational qualification.",
+  "evidenceRefs": [
+    {
+      "class": "verity-root",
+      "ref": "verify/run.sh --verify --board cx3576 --image IMAGE --public-key KEY; current signed file-image checks"
+    },
+    {
+      "class": "ab-fallback",
+      "ref": "tests/file-ab-fit/firmware-io.sh and tests/file-ab-fit/records.sh"
+    },
+    {
+      "class": "update-negative",
+      "ref": "pkgs/mica-deploy/tests/deployments.rs and pkgs/mica-deploy/tests/acquisition.rs"
+    },
+    {
+      "class": "signature-negative",
+      "ref": "tests/file-ab-fit/signatures.sh"
+    }
+  ],
+  "physicalBoundaries": {
+    "jtag": "Open on the bench; no closed or fused state is documented or enforced for any revision (docs/design/manufacturing.md section 6).",
+    "serialConsole": "Present in the field with a login prompt only; no account accepts a credential (docs/design/access.md section 2).",
+    "recoveryPath": "rockusb SoC loader mode, open to anyone with physical access; it is the recovery path and the stated physical-access boundary (docs/design/manufacturing.md section 6)."
+  }
+}

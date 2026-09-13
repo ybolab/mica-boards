@@ -1,0 +1,10 @@
+# The build context is this producer's own directory and NOTHING is copied out
+# of it directly. Its control template and its own copyright come over as the
+# `boarddeb` context -- this same directory, named -- so that producer.env and
+# the PREPARE hook render.sh, which only the host reads, cannot invalidate
+# this producer's cache when they are edited.
+#
+# The shared boot/common/copyright is deliberately not used here,
+# since this payload carries vendor firmware and GPL-2.0 kernel modules that
+# it has to record on their own terms.
+*
