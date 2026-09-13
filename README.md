@@ -8,7 +8,7 @@ pending; `BOARD_RELEASE_TARGET=0` remains set. See the
 
 ## Build inputs
 
-Use the pinned builder images described in [build design](../../docs/design/build.md).
+Use the pinned builder images described in [build design](../../mica:docs/design/build.md).
 Generate development keys explicitly, or supply existing signing material:
 
 ```bash
